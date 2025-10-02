@@ -1,0 +1,47 @@
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer
+from sqlalchemy.orm import Session
+import uvicorn
+
+from app.database import get_db
+from app.routers import auth, inventory, prescriptions, patients, billing, reports
+from app.config import settings
+
+app = FastAPI(
+    title="Pharmacy Management System",
+    description="A comprehensive pharmacy management system built with FastAPI",
+    version="1.0.0"
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # React frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
+app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"])
+app.include_router(prescriptions.router, prefix="/api/prescriptions", tags=["prescriptions"])
+app.include_router(patients.router, prefix="/api/patients", tags=["patients"])
+app.include_router(billing.router, prefix="/api/billing", tags=["billing"])
+app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
+
+@app.get("/")
+async def root():
+    return {"message": "Pharmacy Management System API"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+@app.get("/test")
+async def test():
+    return {"message": "Test endpoint working"}
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
