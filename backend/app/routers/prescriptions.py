@@ -10,12 +10,12 @@ import aiofiles
 from ..database import get_db
 from ..models import (
     User, Patient, Prescription, PrescriptionItem, Medicine, MedicineBatch,
-    StockMovement, AuditLog
+    StockMovement, AuditLog, PrescriptionStatus
 )
 from ..schemas.prescriptions import (
     Prescription as PrescriptionSchema, PrescriptionCreate, PrescriptionUpdate,
     PrescriptionWithItems, PrescriptionWithDetails, PrescriptionValidation,
-    PrescriptionFill, PrescriptionSearch, PrescriptionSummary
+    PrescriptionFill, PrescriptionSearch, PrescriptionSummary, PrescriptionItemWithDetails
 )
 from ..utils.auth import get_current_active_user, require_pharmacist
 from ..config import settings
@@ -98,7 +98,7 @@ def validate_prescription_items(
     
     return validation
 
-@router.post("/prescriptions", response_model=PrescriptionWithItems)
+@router.post("/", response_model=PrescriptionWithItems)
 async def create_prescription(
     prescription: PrescriptionCreate,
     current_user: User = Depends(require_pharmacist),
@@ -134,7 +134,7 @@ async def create_prescription(
         doctor_license=prescription.doctor_license,
         diagnosis=prescription.diagnosis,
         notes=prescription.notes,
-        status="pending"
+        status=PrescriptionStatus.PENDING
     )
     
     db.add(db_prescription)
@@ -176,7 +176,7 @@ async def create_prescription(
     
     return PrescriptionWithItems(**db_prescription.__dict__, items=items)
 
-@router.post("/prescriptions/upload")
+@router.post("/upload")
 async def upload_prescription(
     patient_id: int,
     file: UploadFile = File(...),
@@ -209,7 +209,7 @@ async def upload_prescription(
         diagnosis=diagnosis,
         notes=notes,
         file_path=file_path,
-        status="pending"
+        status=PrescriptionStatus.PENDING
     )
     
     db.add(db_prescription)
@@ -229,7 +229,7 @@ async def upload_prescription(
     
     return db_prescription
 
-@router.get("/prescriptions", response_model=List[PrescriptionSummary])
+@router.get("/", response_model=List[PrescriptionSummary])
 async def list_prescriptions(
     skip: int = 0,
     limit: int = 50,
@@ -249,7 +249,16 @@ async def list_prescriptions(
     ).group_by(Prescription.id, Patient.id)
     
     if status:
-        query = query.filter(Prescription.status == status)
+        # Convert string status to enum value
+        try:
+            status_enum = PrescriptionStatus[status.upper()]
+            query = query.filter(Prescription.status == status_enum)
+        except KeyError:
+            # Handle invalid status values
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status value: {status}. Valid values are: {', '.join([s.name for s in PrescriptionStatus])}"
+            )
     
     if patient_id:
         query = query.filter(Prescription.patient_id == patient_id)
@@ -271,7 +280,7 @@ async def list_prescriptions(
     
     return result
 
-@router.get("/prescriptions/{prescription_id}", response_model=PrescriptionWithDetails)
+@router.get("/{prescription_id}", response_model=PrescriptionWithDetails)
 async def get_prescription(
     prescription_id: int,
     current_user: User = Depends(get_current_active_user),
@@ -316,7 +325,7 @@ async def get_prescription(
         created_by_name=creator.full_name
     )
 
-@router.put("/prescriptions/{prescription_id}", response_model=PrescriptionSchema)
+@router.put("/{prescription_id}", response_model=PrescriptionSchema)
 async def update_prescription(
     prescription_id: int,
     prescription_update: PrescriptionUpdate,
@@ -333,10 +342,19 @@ async def update_prescription(
     # Update prescription fields if provided
     update_data = prescription_update.dict(exclude_unset=True)
     for field, value in update_data.items():
+        if field == "status" and isinstance(value, str):
+            # Convert string status to enum if needed
+            try:
+                value = PrescriptionStatus[value.upper()]
+            except KeyError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid status value: {value}. Valid values are: {', '.join([s.name for s in PrescriptionStatus])}"
+                )
         setattr(db_prescription, field, value)
     
     # Set filled_at timestamp if status is being changed to filled
-    if prescription_update.status == "filled" and old_status != "filled":
+    if db_prescription.status == PrescriptionStatus.FILLED and old_status != PrescriptionStatus.FILLED:
         db_prescription.filled_at = datetime.utcnow()
     
     db.commit()
@@ -355,7 +373,7 @@ async def update_prescription(
     
     return db_prescription
 
-@router.post("/prescriptions/{prescription_id}/validate", response_model=PrescriptionValidation)
+@router.post("/{prescription_id}/validate", response_model=PrescriptionValidation)
 async def validate_prescription(
     prescription_id: int,
     current_user: User = Depends(get_current_active_user),
@@ -377,7 +395,7 @@ async def validate_prescription(
     
     return validation
 
-@router.post("/prescriptions/fill", response_model=PrescriptionSchema)
+@router.post("/fill", response_model=PrescriptionSchema)
 async def fill_prescription(
     fill_data: PrescriptionFill,
     current_user: User = Depends(require_pharmacist),
@@ -391,7 +409,7 @@ async def fill_prescription(
     if not prescription:
         raise HTTPException(status_code=404, detail="Prescription not found")
     
-    if prescription.status != "pending":
+    if prescription.status != PrescriptionStatus.PENDING:
         raise HTTPException(
             status_code=400,
             detail=f"Cannot fill prescription with status: {prescription.status}"
@@ -441,7 +459,7 @@ async def fill_prescription(
         db.add(stock_movement)
     
     # Update prescription status
-    prescription.status = "filled"
+    prescription.status = PrescriptionStatus.FILLED
     prescription.filled_at = datetime.utcnow()
     
     db.commit()
@@ -459,7 +477,7 @@ async def fill_prescription(
     
     return prescription
 
-@router.get("/prescriptions/search", response_model=List[PrescriptionSummary])
+@router.get("/search", response_model=List[PrescriptionSummary])
 async def search_prescriptions(
     search: PrescriptionSearch,
     current_user: User = Depends(get_current_active_user),
@@ -487,7 +505,16 @@ async def search_prescriptions(
         )
     
     if search.status:
-        query = query.filter(Prescription.status == search.status)
+        # Convert string status to enum value
+        try:
+            status_enum = PrescriptionStatus[search.status.upper()]
+            query = query.filter(Prescription.status == status_enum)
+        except KeyError:
+            # Handle invalid status values
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status value: {search.status}. Valid values are: {', '.join([s.name for s in PrescriptionStatus])}"
+            )
     
     if search.patient_id:
         query = query.filter(Prescription.patient_id == search.patient_id)
@@ -516,3 +543,31 @@ async def search_prescriptions(
         ))
     
     return result
+
+@router.get("/create/medicines", response_model=List[dict])
+async def get_medicines_for_creation(
+    search: Optional[str] = Query(None, description="Search medicines by name"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get list of medicines for prescription creation form"""
+    query = db.query(Medicine)
+    
+    if search:
+        query = query.filter(Medicine.name.ilike(f"%{search}%"))
+    
+    medicines = query.all()
+    
+    # Return medicines in format suitable for frontend
+    return [
+        {
+            "id": medicine.id,
+            "name": medicine.name,
+            "generic_name": medicine.generic_name,
+            "strength": medicine.strength,
+            "unit": medicine.unit,
+            "requires_prescription": medicine.requires_prescription,
+            "price": medicine.price
+        }
+        for medicine in medicines
+    ]

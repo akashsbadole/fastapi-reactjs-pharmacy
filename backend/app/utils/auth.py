@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..database import get_db
-from ..models import User
+from ..models import User, UserRole
 from ..schemas.auth import TokenData
 
 # Password hashing
@@ -108,7 +108,7 @@ def require_role(allowed_roles: list):
     return role_checker
 
 # Common role dependencies
-require_admin = require_role(["admin"])
-require_pharmacist = require_role(["admin", "pharmacist"])
-require_cashier = require_role(["admin", "pharmacist", "cashier"])
-require_doctor = require_role(["admin", "pharmacist", "doctor"])
+require_admin = require_role([UserRole.ADMIN])
+require_pharmacist = require_role([UserRole.ADMIN, UserRole.PHARMACIST])
+require_cashier = require_role([UserRole.ADMIN, UserRole.PHARMACIST, UserRole.CASHIER])
+require_doctor = require_role([UserRole.ADMIN, UserRole.PHARMACIST, UserRole.DOCTOR])

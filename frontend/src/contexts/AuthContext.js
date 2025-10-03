@@ -132,6 +132,8 @@ export const AuthProvider = ({ children }) => {
     
     if (token) {
       try {
+        // Set the token in the authAPI instance for this request
+        authAPI.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         const response = await authAPI.get(endpoints.AUTH.ME);
         dispatch({
           type: AUTH_ACTIONS.USER_LOADED,
@@ -155,20 +157,22 @@ export const AuthProvider = ({ children }) => {
     
     try {
       const response = await authAPI.post(endpoints.AUTH.LOGIN, credentials);
-      const { token, refreshToken } = response.data;
+      const { access_token, refresh_token, token_type } = response.data;
       
       // Set tokens in localStorage first
-      localStorage.setItem('token', token);
-      localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('token', access_token);
+      localStorage.setItem('refreshToken', refresh_token);
       
       // Load user data with the new token
+      // Set the token in the authAPI instance for this request
+      authAPI.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       const userResponse = await authAPI.get(endpoints.AUTH.ME);
       
       dispatch({
         type: AUTH_ACTIONS.LOGIN_SUCCESS,
         payload: {
-          token,
-          refreshToken,
+          token: access_token,
+          refreshToken: refresh_token,
           user: userResponse.data,
         },
       });
@@ -210,14 +214,15 @@ export const AuthProvider = ({ children }) => {
         refresh_token: refreshTokenValue,
       });
       
-      const { token, refreshToken: newRefreshToken } = response.data;
+      const { access_token, refresh_token: newRefreshToken, token_type } = response.data;
       
-      setAuthToken(token);
+      setAuthToken(access_token);
       setRefreshToken(newRefreshToken);
+      authAPI.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       
       dispatch({
         type: AUTH_ACTIONS.REFRESH_TOKEN_SUCCESS,
-        payload: { token, refreshToken: newRefreshToken },
+        payload: { token: access_token, refreshToken: newRefreshToken },
       });
       
       return true;
@@ -244,7 +249,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const requestInterceptor = authAPI.interceptors.request.use(
       (config) => {
-        // Don't interfere with auth endpoints
+        // Set token for all requests except auth endpoints
         if (!config.url.includes('/auth/')) {
           const token = localStorage.getItem('token');
           if (token) {

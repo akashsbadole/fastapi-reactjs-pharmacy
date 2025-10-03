@@ -11,16 +11,35 @@ import Layout from './components/Layout';
 import Login from './pages/auth/Login';
 import Dashboard from './pages/Dashboard';
 import Patients from './pages/patients/Patients';
+import PatientCreate from './pages/patients/PatientCreate';
 import PatientDetails from './pages/patients/PatientDetails';
+import PatientEdit from './pages/patients/PatientEdit';
 import Inventory from './pages/inventory/Inventory';
 import Medicines from './pages/inventory/Medicines';
+import MedicineCreate from './pages/inventory/MedicineCreate';
+import MedicineDetails from './pages/inventory/MedicineDetails';
+import MedicineEdit from './pages/inventory/MedicineEdit';
+import InventoryAnalytics from './pages/inventory/InventoryAnalytics';
+import BatchCreate from './pages/inventory/BatchCreate';
+import BatchDetails from './pages/inventory/BatchDetails';
+import BatchEdit from './pages/inventory/BatchEdit';
 import Suppliers from './pages/inventory/Suppliers';
+import SupplierCreate from './pages/inventory/SupplierCreate';
+import SupplierDetails from './pages/inventory/SupplierDetails';
 import Prescriptions from './pages/prescriptions/Prescriptions';
 import PrescriptionDetails from './pages/prescriptions/PrescriptionDetails';
+import PrescriptionCreate from './pages/prescriptions/PrescriptionCreate';
 import Billing from './pages/billing/Billing';
+import CreateInvoice from './pages/billing/CreateInvoice';
+import EditInvoice from './pages/billing/EditInvoice';
+import AddPayment from './pages/billing/AddPayment';
 import InvoiceDetails from './pages/billing/InvoiceDetails';
+import PointOfSale from './pages/pos/PointOfSale';
 import Reports from './pages/reports/Reports';
 import Users from './pages/users/Users';
+import CreateUser from './pages/users/CreateUser';
+import UserDetails from './pages/users/UserDetails';
+import EditUser from './pages/users/EditUser';
 import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
 
@@ -38,7 +57,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router>
+        <Router future={{ v7_relativeSplatPath: true }}>
           <div className="App">
             <Routes>
               {/* Public routes */}
@@ -55,26 +74,47 @@ function App() {
                 
                 {/* Patient routes */}
                 <Route path="patients" element={<Patients />} />
+                <Route path="patients/create" element={<PatientCreate />} />
                 <Route path="patients/:id" element={<PatientDetails />} />
+                <Route path="patients/:id/edit" element={<PatientEdit />} />
                 
                 {/* Inventory routes */}
                 <Route path="inventory" element={<Inventory />} />
-                <Route path="medicines" element={<Medicines />} />
-                <Route path="suppliers" element={<Suppliers />} />
+                <Route path="inventory/medicines" element={<Medicines />} />
+                <Route path="inventory/medicines/create" element={<MedicineCreate />} />
+                <Route path="inventory/medicines/:id" element={<MedicineDetails />} />
+                <Route path="inventory/medicines/:id/edit" element={<MedicineEdit />} />
+                <Route path="inventory/batches/create" element={<BatchCreate />} />
+                <Route path="inventory/batches/:id" element={<BatchDetails />} />
+                <Route path="inventory/batches/:id/edit" element={<BatchEdit />} />
+                <Route path="inventory/analytics" element={<InventoryAnalytics />} />
+                <Route path="inventory/suppliers" element={<Suppliers />} />
+                <Route path="inventory/suppliers/create" element={<SupplierCreate />} />
+                <Route path="inventory/suppliers/:id" element={<SupplierDetails />} />
                 
                 {/* Prescription routes */}
                 <Route path="prescriptions" element={<Prescriptions />} />
+                <Route path="prescriptions/create" element={<PrescriptionCreate />} />
                 <Route path="prescriptions/:id" element={<PrescriptionDetails />} />
                 
                 {/* Billing routes */}
                 <Route path="billing" element={<Billing />} />
+                <Route path="billing/create" element={<CreateInvoice />} />
                 <Route path="billing/invoices/:id" element={<InvoiceDetails />} />
+                <Route path="billing/invoices/:id/edit" element={<EditInvoice />} />
+                <Route path="billing/invoices/:id/payments" element={<AddPayment />} />
+                
+                {/* POS routes */}
+                <Route path="pos" element={<PointOfSale />} />
                 
                 {/* Reports routes */}
                 <Route path="reports" element={<Reports />} />
                 
                 {/* User management */}
                 <Route path="users" element={<Users />} />
+                <Route path="users/create" element={<CreateUser />} />
+                <Route path="users/:id" element={<UserDetails />} />
+                <Route path="users/:id/edit" element={<EditUser />} />
                 
                 {/* Profile */}
                 <Route path="profile" element={<Profile />} />

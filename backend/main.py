@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 import uvicorn
 
 from app.database import get_db
-from app.routers import auth, inventory, prescriptions, patients, billing, reports
+from app.routers import auth, inventory, prescriptions, patients, billing, reports, pos
 from app.config import settings
 
 app = FastAPI(
@@ -17,10 +17,11 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React frontend
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # React frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include routers
@@ -29,6 +30,7 @@ app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"]
 app.include_router(prescriptions.router, prefix="/api/prescriptions", tags=["prescriptions"])
 app.include_router(patients.router, prefix="/api/patients", tags=["patients"])
 app.include_router(billing.router, prefix="/api/billing", tags=["billing"])
+app.include_router(pos.router, prefix="/api/pos", tags=["pos"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 
 @app.get("/")

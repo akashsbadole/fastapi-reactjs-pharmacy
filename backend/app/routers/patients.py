@@ -5,11 +5,12 @@ from typing import List, Optional
 from datetime import date, datetime
 
 from ..database import get_db
-from ..models import User, Patient, Prescription, AuditLog
+from ..models import User, Patient, Prescription, PrescriptionItem, AuditLog
 from ..schemas.patients import (
     Patient as PatientSchema, PatientCreate, PatientUpdate,
     PatientSummary, PatientSearch
 )
+from ..schemas.prescriptions import PrescriptionSummary
 from ..utils.auth import get_current_active_user, require_cashier
 
 router = APIRouter()
@@ -21,7 +22,7 @@ def calculate_age(date_of_birth: date) -> int:
         age -= 1
     return age
 
-@router.post("/patients", response_model=PatientSchema)
+@router.post("/", response_model=PatientSchema)
 async def create_patient(
     patient: PatientCreate,
     current_user: User = Depends(require_cashier),
@@ -61,7 +62,7 @@ async def create_patient(
     
     return db_patient
 
-@router.get("/patients", response_model=List[PatientSummary])
+@router.get("/", response_model=List[PatientSummary])
 async def list_patients(
     skip: int = 0,
     limit: int = 100,
@@ -100,7 +101,7 @@ async def list_patients(
     
     return patient_summaries
 
-@router.get("/patients/search", response_model=List[PatientSummary])
+@router.get("/search", response_model=List[PatientSummary])
 async def search_patients(
     search: PatientSearch,
     current_user: User = Depends(get_current_active_user),
@@ -134,7 +135,7 @@ async def search_patients(
     
     return patient_summaries
 
-@router.get("/patients/{patient_id}", response_model=PatientSchema)
+@router.get("/{patient_id}", response_model=PatientSchema)
 async def get_patient(
     patient_id: int,
     current_user: User = Depends(get_current_active_user),
@@ -145,7 +146,7 @@ async def get_patient(
         raise HTTPException(status_code=404, detail="Patient not found")
     return patient
 
-@router.get("/patients/by-patient-id/{patient_identifier}", response_model=PatientSchema)
+@router.get("/by-patient-id/{patient_identifier}", response_model=PatientSchema)
 async def get_patient_by_identifier(
     patient_identifier: str,
     current_user: User = Depends(get_current_active_user),
@@ -156,7 +157,7 @@ async def get_patient_by_identifier(
         raise HTTPException(status_code=404, detail="Patient not found")
     return patient
 
-@router.put("/patients/{patient_id}", response_model=PatientSchema)
+@router.put("/{patient_id}", response_model=PatientSchema)
 async def update_patient(
     patient_id: int,
     patient_update: PatientUpdate,
@@ -204,7 +205,7 @@ async def update_patient(
     
     return db_patient
 
-@router.get("/patients/{patient_id}/prescriptions")
+@router.get("/{patient_id}/prescriptions", response_model=List[PrescriptionSummary])
 async def get_patient_prescriptions(
     patient_id: int,
     skip: int = 0,
@@ -217,13 +218,37 @@ async def get_patient_prescriptions(
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
     
-    prescriptions = db.query(Prescription).filter(
+    # Get prescriptions with item count
+    prescriptions = db.query(
+        Prescription,
+        Patient,
+        func.count(PrescriptionItem.id).label('total_items')
+    ).join(
+        Patient, Prescription.patient_id == Patient.id
+    ).outerjoin(
+        PrescriptionItem, Prescription.id == PrescriptionItem.prescription_id
+    ).filter(
         Prescription.patient_id == patient_id
-    ).order_by(Prescription.created_at.desc()).offset(skip).limit(limit).all()
+    ).group_by(Prescription.id, Patient.id).order_by(
+        Prescription.created_at.desc()
+    ).offset(skip).limit(limit).all()
     
-    return prescriptions
+    result = []
+    for prescription, patient, total_items in prescriptions:
+        result.append(PrescriptionSummary(
+            id=prescription.id,
+            prescription_number=prescription.prescription_number,
+            patient_id=prescription.patient_id,
+            patient_name=f"{patient.first_name} {patient.last_name}",
+            doctor_name=prescription.doctor_name,
+            status=prescription.status,
+            created_at=prescription.created_at,
+            total_items=total_items or 0
+        ))
+    
+    return result
 
-@router.get("/patients/{patient_id}/summary")
+@router.get("/{patient_id}/summary")
 async def get_patient_summary(
     patient_id: int,
     current_user: User = Depends(get_current_active_user),

@@ -39,7 +39,7 @@ async def get_dashboard_stats(
         and_(
             Invoice.created_at >= start_of_day,
             Invoice.created_at <= end_of_day,
-            Invoice.payment_status == 'paid'
+            Invoice.payment_status == 'PAID'
         )
     ).scalar() or 0.0
     
@@ -72,7 +72,7 @@ async def get_dashboard_stats(
     
     # Pending prescriptions
     pending_prescriptions = db.query(func.count(Prescription.id)).filter(
-        Prescription.status == 'pending'
+        Prescription.status == 'PENDING'
     ).scalar() or 0
     
     # Total patients
@@ -110,7 +110,7 @@ async def get_dashboard_stats(
         recent_activities=activities
     )
 
-@router.get("/reports/sales", response_model=SalesReport)
+@router.get("/sales", response_model=SalesReport)
 async def get_sales_report(
     period: str = Query("week", description="Period: day, week, month, year"),
     current_user: User = Depends(get_current_active_user),
@@ -134,14 +134,14 @@ async def get_sales_report(
         func.date(Invoice.created_at).label('date'),
         func.sum(Invoice.total_amount).label('total_sales'),
         func.count(Invoice.id).label('total_invoices'),
-        func.sum(func.case([(Invoice.payment_mode == 'cash', Invoice.total_amount)], else_=0)).label('cash_sales'),
-        func.sum(func.case([(Invoice.payment_mode == 'card', Invoice.total_amount)], else_=0)).label('card_sales'),
-        func.sum(func.case([(Invoice.payment_mode == 'insurance', Invoice.total_amount)], else_=0)).label('insurance_sales')
+        func.sum(func.case([(Invoice.payment_mode == 'CASH', Invoice.total_amount)], else_=0)).label('cash_sales'),
+        func.sum(func.case([(Invoice.payment_mode == 'CARD', Invoice.total_amount)], else_=0)).label('card_sales'),
+        func.sum(func.case([(Invoice.payment_mode == 'INSURANCE', Invoice.total_amount)], else_=0)).label('insurance_sales')
     ).filter(
         and_(
             Invoice.created_at >= start_date,
             Invoice.created_at <= end_date,
-            Invoice.payment_status == 'paid'
+            Invoice.payment_status == 'PAID'
         )
     ).group_by(func.date(Invoice.created_at)).all()
     
@@ -178,7 +178,7 @@ async def get_sales_report(
         daily_sales=daily_sales
     )
 
-@router.get("/reports/inventory", response_model=InventoryReport)
+@router.get("/inventory", response_model=InventoryReport)
 async def get_inventory_report(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -297,7 +297,7 @@ async def get_inventory_report(
         expiring_details=expiring_list
     )
 
-@router.get("/reports/prescriptions", response_model=PrescriptionReport)
+@router.get("/prescriptions", response_model=PrescriptionReport)
 async def get_prescription_report(
     period: str = Query("month", description="Period: day, week, month, year"),
     current_user: User = Depends(get_current_active_user),
@@ -324,21 +324,21 @@ async def get_prescription_report(
     filled_prescriptions = db.query(func.count(Prescription.id)).filter(
         and_(
             Prescription.created_at >= start_date,
-            Prescription.status == 'filled'
+            Prescription.status == 'FILLED'
         )
     ).scalar() or 0
     
     pending_prescriptions = db.query(func.count(Prescription.id)).filter(
         and_(
             Prescription.created_at >= start_date,
-            Prescription.status == 'pending'
+            Prescription.status == 'PENDING'
         )
     ).scalar() or 0
     
     cancelled_prescriptions = db.query(func.count(Prescription.id)).filter(
         and_(
             Prescription.created_at >= start_date,
-            Prescription.status == 'cancelled'
+            Prescription.status == 'CANCELLED'
         )
     ).scalar() or 0
     
@@ -381,8 +381,8 @@ async def get_prescription_report(
     daily_prescriptions = db.query(
         func.date(Prescription.created_at).label('date'),
         func.count(Prescription.id).label('count'),
-        func.sum(func.case([(Prescription.status == 'filled', 1)], else_=0)).label('filled'),
-        func.sum(func.case([(Prescription.status == 'pending', 1)], else_=0)).label('pending')
+        func.sum(func.case([(Prescription.status == 'FILLED', 1)], else_=0)).label('filled'),
+        func.sum(func.case([(Prescription.status == 'PENDING', 1)], else_=0)).label('pending')
     ).filter(
         Prescription.created_at >= start_date
     ).group_by(func.date(Prescription.created_at)).all()
@@ -407,7 +407,7 @@ async def get_prescription_report(
         daily_prescriptions=daily_list
     )
 
-@router.get("/reports/patients", response_model=PatientReport)
+@router.get("/patients", response_model=PatientReport)
 async def get_patient_report(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -477,7 +477,7 @@ async def get_patient_report(
         top_patients=top_patients_list
     )
 
-@router.get("/reports/financial", response_model=FinancialReport)
+@router.get("/financial", response_model=FinancialReport)
 async def get_financial_report(
     period: str = Query("month", description="Period: day, week, month, year"),
     current_user: User = Depends(get_current_active_user),
@@ -501,7 +501,7 @@ async def get_financial_report(
         and_(
             Invoice.created_at >= start_date,
             Invoice.created_at <= end_date,
-            Invoice.payment_status == 'paid'
+            Invoice.payment_status == 'PAID'
         )
     ).scalar() or 0
     
@@ -516,7 +516,7 @@ async def get_financial_report(
         and_(
             Invoice.created_at >= start_date,
             Invoice.created_at <= end_date,
-            Invoice.payment_status == 'paid'
+            Invoice.payment_status == 'PAID'
         )
     ).scalar() or 0
     
@@ -532,7 +532,7 @@ async def get_financial_report(
         and_(
             Invoice.created_at >= start_date,
             Invoice.created_at <= end_date,
-            Invoice.payment_status == 'paid'
+            Invoice.payment_status == 'PAID'
         )
     ).group_by(Invoice.payment_mode).all()
     
@@ -553,7 +553,7 @@ async def get_financial_report(
             and_(
                 Invoice.created_at >= start_date,
                 Invoice.created_at <= end_date,
-                Invoice.payment_status == 'paid'
+                Invoice.payment_status == 'PAID'
             )
         ).group_by(func.date_trunc('month', Invoice.created_at)).all()
         
@@ -576,7 +576,7 @@ async def get_financial_report(
         monthly_breakdown=monthly_breakdown
     )
 
-@router.get("/reports/suppliers", response_model=SupplierReport)
+@router.get("/suppliers", response_model=SupplierReport)
 async def get_supplier_report(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -648,7 +648,7 @@ async def get_supplier_report(
         supplier_performance=performance_list
     )
 
-@router.get("/reports/audit-logs", response_model=List[AuditLogResponse])
+@router.get("/audit-logs", response_model=List[AuditLogResponse])
 async def get_audit_logs(
     skip: int = 0,
     limit: int = 100,
@@ -694,7 +694,7 @@ async def get_audit_logs(
     
     return result
 
-@router.post("/reports/generate", response_model=ReportResponse)
+@router.post("/generate", response_model=ReportResponse)
 async def generate_custom_report(
     request: ReportRequest,
     current_user: User = Depends(get_current_active_user),

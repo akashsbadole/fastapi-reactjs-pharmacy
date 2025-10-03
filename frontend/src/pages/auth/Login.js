@@ -168,6 +168,10 @@ const Login = () => {
                 <p className="font-medium">Pharmacist:</p>
                 <p>pharmacist / pharm123</p>
               </div>
+              <div className="text-xs text-gray-600">
+                <p className="font-medium">Cashier:</p>
+                <p>cashier / cash123</p>
+              </div>
             </div>
           </div>
         </form>

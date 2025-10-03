@@ -13,6 +13,7 @@ import {
   Bars3Icon,
   XMarkIcon,
   BellIcon,
+  ShoppingCartIcon,
 } from '@heroicons/react/24/outline';
 
 const Layout = () => {
@@ -28,6 +29,7 @@ const Layout = () => {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+    { name: 'Point of Sale', href: '/pos', icon: ShoppingCartIcon },
     { name: 'Patients', href: '/patients', icon: UsersIcon },
     { name: 'Inventory', href: '/inventory', icon: CubeIcon },
     { name: 'Prescriptions', href: '/prescriptions', icon: DocumentTextIcon },
@@ -41,6 +43,9 @@ const Layout = () => {
   }
 
   const isActive = (href) => {
+    if (href === '/inventory') {
+      return location.pathname.startsWith('/inventory');
+    }
     return location.pathname === href;
   };
 

@@ -38,7 +38,7 @@ def generate_invoice_number() -> str:
 def calculate_tax(subtotal: float) -> float:
     return subtotal * TAX_RATE
 
-@router.post("/invoices", response_model=InvoiceWithItems)
+@router.post("/", response_model=InvoiceWithItems)
 async def create_invoice(
     invoice: InvoiceCreate,
     current_user: User = Depends(require_cashier),
@@ -95,7 +95,7 @@ async def create_invoice(
         tax_amount=tax_amount,
         discount_amount=total_discount,
         total_amount=total_amount,
-        payment_status="pending",
+        payment_status="PENDING",
         payment_mode=invoice.payment_mode,
         paid_amount=0.0,
         created_by=current_user.id
@@ -159,7 +159,7 @@ async def create_invoice(
     
     return InvoiceWithItems(**db_invoice.__dict__, items=items)
 
-@router.get("/invoices", response_model=List[InvoiceSummary])
+@router.get("/", response_model=List[InvoiceSummary])
 async def list_invoices(
     skip: int = 0,
     limit: int = 50,
@@ -203,7 +203,7 @@ async def list_invoices(
     
     return result
 
-@router.get("/invoices/{invoice_id}", response_model=InvoiceWithDetails)
+@router.get("/{invoice_id}", response_model=InvoiceWithDetails)
 async def get_invoice(
     invoice_id: int,
     current_user: User = Depends(get_current_active_user),
@@ -250,7 +250,7 @@ async def get_invoice(
         created_by_name=creator.full_name
     )
 
-@router.put("/invoices/{invoice_id}", response_model=InvoiceSchema)
+@router.put("/{invoice_id}", response_model=InvoiceSchema)
 async def update_invoice(
     invoice_id: int,
     invoice_update: InvoiceUpdate,
@@ -285,7 +285,7 @@ async def update_invoice(
     
     return db_invoice
 
-@router.post("/invoices/{invoice_id}/payments", response_model=PaymentSchema)
+@router.post("/{invoice_id}/payments", response_model=PaymentSchema)
 async def create_payment(
     invoice_id: int,
     payment: PaymentCreate,
@@ -322,9 +322,9 @@ async def create_payment(
     
     # Update payment status if fully paid
     if invoice.paid_amount >= invoice.total_amount:
-        invoice.payment_status = "paid"
+        invoice.payment_status = "PAID"
     elif invoice.paid_amount > 0:
-        invoice.payment_status = "partial"
+        invoice.payment_status = "PARTIAL"
     
     db.commit()
     db.refresh(db_payment)
@@ -342,7 +342,7 @@ async def create_payment(
     
     return db_payment
 
-@router.get("/invoices/{invoice_id}/payments", response_model=List[PaymentSchema])
+@router.get("/{invoice_id}/payments", response_model=List[PaymentSchema])
 async def get_invoice_payments(
     invoice_id: int,
     current_user: User = Depends(get_current_active_user),
@@ -356,7 +356,7 @@ async def get_invoice_payments(
     payments = db.query(Payment).filter(Payment.invoice_id == invoice_id).all()
     return payments
 
-@router.post("/invoices/{invoice_id}/refund")
+@router.post("/{invoice_id}/refund")
 async def refund_invoice(
     invoice_id: int,
     refund: RefundCreate,
@@ -369,7 +369,7 @@ async def refund_invoice(
         raise HTTPException(status_code=404, detail="Invoice not found")
     
     # Check if invoice is paid
-    if invoice.payment_status != "paid":
+    if invoice.payment_status != "PAID":
         raise HTTPException(
             status_code=400,
             detail="Only paid invoices can be refunded"
@@ -393,7 +393,7 @@ async def refund_invoice(
     db.add(db_refund)
     
     # Update invoice status
-    invoice.payment_status = "refunded"
+    invoice.payment_status = "REFUNDED"
     invoice.paid_amount = 0
     
     # Return items to stock (simplified - would need to track which items to return)
@@ -430,7 +430,7 @@ async def refund_invoice(
     
     return {"message": "Invoice refunded successfully", "refund_id": db_refund.id}
 
-@router.get("/billing/sales-report", response_model=SalesReport)
+@router.get("/sales-report", response_model=SalesReport)
 async def get_sales_report(
     period: str = Query("week", description="Period: day, week, month, year"),
     current_user: User = Depends(get_current_active_user),
@@ -454,14 +454,14 @@ async def get_sales_report(
         func.date(Invoice.created_at).label('date'),
         func.sum(Invoice.total_amount).label('total_sales'),
         func.count(Invoice.id).label('total_invoices'),
-        func.sum(func.case([(Invoice.payment_mode == 'cash', Invoice.total_amount)], else_=0)).label('cash_sales'),
-        func.sum(func.case([(Invoice.payment_mode == 'card', Invoice.total_amount)], else_=0)).label('card_sales'),
-        func.sum(func.case([(Invoice.payment_mode == 'insurance', Invoice.total_amount)], else_=0)).label('insurance_sales')
+        func.sum(func.case([(Invoice.payment_mode == 'CASH', Invoice.total_amount)], else_=0)).label('cash_sales'),
+        func.sum(func.case([(Invoice.payment_mode == 'CARD', Invoice.total_amount)], else_=0)).label('card_sales'),
+        func.sum(func.case([(Invoice.payment_mode == 'INSURANCE', Invoice.total_amount)], else_=0)).label('insurance_sales')
     ).filter(
         and_(
             Invoice.created_at >= start_date,
             Invoice.created_at <= end_date,
-            Invoice.payment_status == 'paid'
+            Invoice.payment_status == 'PAID'
         )
     ).group_by(func.date(Invoice.created_at)).all()
     
@@ -498,7 +498,7 @@ async def get_sales_report(
         daily_sales=daily_sales
     )
 
-@router.post("/billing/calculate-tax", response_model=TaxCalculation)
+@router.post("/calculate-tax", response_model=TaxCalculation)
 async def calculate_tax_endpoint(
     subtotal: float,
     current_user: User = Depends(get_current_active_user)

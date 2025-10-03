@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from 'react-query';
 import { Link } from 'react-router-dom';
-import { endpoints } from '../../services/api';
+import { api, endpoints } from '../../services/api';
 import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import Loader from '../../components/Loader';
 
@@ -10,17 +10,17 @@ const Patients = () => {
 
   const { data: patients, isLoading } = useQuery(
     'patients',
-    () => fetch(endpoints.PATIENTS.LIST).then(res => res.json()),
+    () => api.get(endpoints.PATIENTS.LIST).then(res => res.data),
     {
       refetchOnWindowFocus: false,
     }
   );
 
-  const filteredPatients = patients?.filter(patient =>
+  const filteredPatients = Array.isArray(patients) ? patients.filter(patient =>
     patient.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     patient.patient_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (patient.phone && patient.phone.includes(searchTerm))
-  ) || [];
+  ) : [];
 
   if (isLoading) {
     return <Loader text="Loading patients..." />;

@@ -33,6 +33,18 @@ authAPI.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Add request interceptor to include auth token for all API calls
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // API endpoints
 export const endpoints = {
   // Auth endpoints
@@ -40,7 +52,7 @@ export const endpoints = {
     LOGIN: '/api/auth/login',
     REGISTER: '/api/auth/register',
     REFRESH: '/api/auth/refresh',
-    // ME: '/api/auth/me',
+    ME: '/api/auth/me',
     CHANGE_PASSWORD: '/api/auth/change-password',
     USERS: '/api/auth/users',
   },
@@ -67,6 +79,10 @@ export const endpoints = {
     STOCK_MOVEMENT: (id) => `/api/inventory/batches/${id}/stock-movement`,
     LOW_STOCK_ALERTS: '/api/inventory/alerts/low-stock',
     EXPIRING_SOON: '/api/inventory/alerts/expiring-soon',
+    EXPORT_MEDICINES_CSV: '/api/inventory/medicines/export/csv',
+    IMPORT_MEDICINES_CSV: '/api/inventory/medicines/import/csv',
+    ANALYTICS_SUMMARY: '/api/inventory/analytics/summary',
+    ANALYTICS_STOCK_MOVEMENT: '/api/inventory/analytics/stock-movement',
   },
   
   // Prescription endpoints
@@ -89,6 +105,29 @@ export const endpoints = {
     REFUND: (id) => `/api/billing/invoices/${id}/refund`,
     SALES_REPORT: '/api/billing/sales-report',
     CALCULATE_TAX: '/api/billing/calculate-tax',
+  },
+  
+  // POS endpoints
+  POS: {
+    MEDICINES_SEARCH: '/api/pos/medicines/search',
+    BARCODE_SCAN: '/api/pos/barcode/scan',
+    STOCK_ALERTS: '/api/pos/stock/alerts',
+    CART_CALCULATE: '/api/pos/cart/calculate',
+    QUICK_SALE: '/api/pos/sale/quick',
+    PROCESS_SALE: '/api/pos/sale',
+    RECEIPT: (id) => `/api/pos/receipt/${id}`,
+    CONFIG: '/api/pos/config',
+    DAILY_SUMMARY: '/api/pos/summary/daily',
+    HOLD_BILL: '/api/pos/hold',
+    HOLD_BILL_LIST: '/api/pos/hold/list',
+    RELEASE_HOLD_BILL: (id) => `/api/pos/hold/${id}/release`,
+    DELETE_HOLD_BILL: (id) => `/api/pos/hold/${id}`,
+    PROCESS_REFUND: '/api/pos/refund',
+    SEND_DIGITAL_RECEIPT: '/api/pos/send-digital-receipt',
+    PRINT_BARCODES: '/api/pos/print-barcodes',
+    SYNC_TRANSACTION: '/api/pos/sync-transaction',
+    STAFF_LOGIN: '/api/auth/staff-login',
+    END_SHIFT: '/api/pos/end-shift',
   },
   
   // Reports endpoints
@@ -193,6 +232,39 @@ export const apiHelpers = {
     });
     
     const response = await api.post(endpoint, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    return response.data;
+  },
+  
+  // Download CSV file
+  downloadCSV: async (endpoint, filename) => {
+    const response = await authAPI.get(endpoint, {
+      responseType: 'blob',
+    });
+    
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    
+    return response.data;
+  },
+  
+  // Import CSV file
+  importCSV: async (endpoint, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await authAPI.post(endpoint, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

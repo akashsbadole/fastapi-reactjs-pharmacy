@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from 'react-query';
 import { Link } from 'react-router-dom';
-import { endpoints } from '../services/api';
+import { api, endpoints } from '../services/api';
 import {
   UsersIcon,
   CubeIcon,
@@ -13,11 +13,13 @@ import {
 import Loader from '../components/Loader';
 
 const Dashboard = () => {
-  const { data: stats, isLoading } = useQuery(
+  const { data: stats, isLoading, error } = useQuery(
     'dashboard-stats',
-    () => fetch(endpoints.REPORTS.DASHBOARD_STATS).then(res => res.json()),
+    () => api.get(endpoints.REPORTS.DASHBOARD_STATS).then(res => res.data),
     {
       refetchInterval: 60000, // Refetch every minute
+      retry: 1,
+      retryDelay: 1000,
     }
   );
 
@@ -25,31 +27,43 @@ const Dashboard = () => {
     return <Loader text="Loading dashboard..." />;
   }
 
+  // Use default data if API call fails
+  const statsData = stats || {
+    total_sales_today: 0,
+    total_orders_today: 0,
+    total_patients: 0,
+    total_medicines: 0,
+    low_stock_alerts: 0,
+    expiring_soon_alerts: 0,
+    pending_prescriptions: 0,
+    recent_activities: [],
+  };
+
   const statCards = [
     {
       name: 'Today\'s Sales',
-      value: `$${stats?.total_sales_today?.toFixed(2) || '0.00'}`,
+      value: `$${statsData.total_sales_today?.toFixed(2) || '0.00'}`,
       icon: CurrencyDollarIcon,
       color: 'bg-green-500',
       link: '/billing',
     },
     {
       name: 'Today\'s Orders',
-      value: stats?.total_orders_today || 0,
+      value: statsData.total_orders_today || 0,
       icon: DocumentTextIcon,
       color: 'bg-blue-500',
       link: '/billing',
     },
     {
       name: 'Total Patients',
-      value: stats?.total_patients || 0,
+      value: statsData.total_patients || 0,
       icon: UsersIcon,
       color: 'bg-purple-500',
       link: '/patients',
     },
     {
       name: 'Total Medicines',
-      value: stats?.total_medicines || 0,
+      value: statsData.total_medicines || 0,
       icon: CubeIcon,
       color: 'bg-yellow-500',
       link: '/inventory',
@@ -59,28 +73,28 @@ const Dashboard = () => {
   const alertCards = [
     {
       name: 'Low Stock Alerts',
-      value: stats?.low_stock_alerts || 0,
+      value: statsData.low_stock_alerts || 0,
       icon: ExclamationTriangleIcon,
       color: 'bg-orange-500',
       link: '/inventory?alerts=low-stock',
     },
     {
       name: 'Expiring Soon',
-      value: stats?.expiring_soon_alerts || 0,
+      value: statsData.expiring_soon_alerts || 0,
       icon: ClockIcon,
       color: 'bg-red-500',
       link: '/inventory?alerts=expiring',
     },
     {
       name: 'Pending Prescriptions',
-      value: stats?.pending_prescriptions || 0,
+      value: statsData.pending_prescriptions || 0,
       icon: DocumentTextIcon,
       color: 'bg-yellow-500',
       link: '/prescriptions?status=pending',
     },
   ];
 
-  const recentActivities = stats?.recent_activities || [];
+  const recentActivities = statsData.recent_activities || [];
 
   return (
     <div className="px-4 py-6 sm:px-6 lg:px-8">
@@ -89,6 +103,14 @@ const Dashboard = () => {
         <p className="mt-1 text-sm text-gray-600">
           Welcome to your pharmacy management system dashboard.
         </p>
+        {error && (
+          <div className="mt-2 p-3 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700">
+            <p className="text-sm">
+              <span className="font-medium">Warning:</span> Unable to load dashboard data.
+              {error.response?.status === 401 ? ' Please ensure the backend API is running and you are logged in.' : ' Using default values.'}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Stats Grid */}

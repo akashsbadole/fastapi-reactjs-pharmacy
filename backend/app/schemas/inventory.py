@@ -42,6 +42,23 @@ class MedicineBase(BaseModel):
     manufacturer: Optional[str] = None
     requires_prescription: bool = False
     barcode: Optional[str] = None
+    
+    # Additional pharmacy management fields
+    sku: Optional[str] = None
+    pack_size: Optional[str] = None
+    hsn_code: Optional[str] = None
+    mrp: Optional[float] = None
+    purchase_price: Optional[float] = None
+    selling_price: Optional[float] = None
+    tax_percent: Optional[float] = 0.0
+    stock_quantity: Optional[int] = 0
+    reorder_level: Optional[int] = 10
+    storage_condition: Optional[str] = None
+    schedule: Optional[str] = None
+    alternative_drug_names: Optional[str] = None
+    substitution_allowed: Optional[bool] = True
+    location: Optional[str] = None
+    notes: Optional[str] = None
 
 class MedicineCreate(MedicineBase):
     pass
@@ -57,6 +74,24 @@ class MedicineUpdate(BaseModel):
     manufacturer: Optional[str] = None
     requires_prescription: Optional[bool] = None
     barcode: Optional[str] = None
+    
+    # Additional pharmacy management fields
+    sku: Optional[str] = None
+    pack_size: Optional[str] = None
+    hsn_code: Optional[str] = None
+    mrp: Optional[float] = None
+    purchase_price: Optional[float] = None
+    selling_price: Optional[float] = None
+    tax_percent: Optional[float] = None
+    stock_quantity: Optional[int] = None
+    reorder_level: Optional[int] = None
+    storage_condition: Optional[str] = None
+    schedule: Optional[str] = None
+    alternative_drug_names: Optional[str] = None
+    substitution_allowed: Optional[bool] = None
+    location: Optional[str] = None
+    notes: Optional[str] = None
+    
     is_active: Optional[bool] = None
 
 class Medicine(MedicineBase):

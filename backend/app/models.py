@@ -6,28 +6,28 @@ import enum
 
 # Enums
 class UserRole(enum.Enum):
-    ADMIN = "admin"
-    PHARMACIST = "pharmacist"
-    CASHIER = "cashier"
-    DOCTOR = "doctor"
+    ADMIN = "ADMIN"
+    PHARMACIST = "PHARMACIST"
+    CASHIER = "CASHIER"
+    DOCTOR = "DOCTOR"
 
 class PrescriptionStatus(enum.Enum):
-    PENDING = "pending"
-    APPROVED = "approved"
-    FILLED = "filled"
-    CANCELLED = "cancelled"
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    FILLED = "FILLED"
+    CANCELLED = "CANCELLED"
 
 class PaymentStatus(enum.Enum):
-    PENDING = "pending"
-    PAID = "paid"
-    REFUNDED = "refunded"
-    PARTIAL = "partial"
+    PENDING = "PENDING"
+    PAID = "PAID"
+    REFUNDED = "REFUNDED"
+    PARTIAL = "PARTIAL"
 
 class PaymentMode(enum.Enum):
-    CASH = "cash"
-    CARD = "card"
-    INSURANCE = "insurance"
-    ONLINE = "online"
+    CASH = "CASH"
+    CARD = "CARD"
+    INSURANCE = "INSURANCE"
+    ONLINE = "ONLINE"
 
 # User Model
 class User(Base):
@@ -37,6 +37,7 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    pin = Column(String, unique=True, index=True)  # 4-digit PIN for POS login
     full_name = Column(String, nullable=False)
     phone = Column(String)
     role = Column(Enum(UserRole), default=UserRole.CASHIER)
@@ -107,6 +108,24 @@ class Medicine(Base):
     manufacturer = Column(String)
     requires_prescription = Column(Boolean, default=False)
     barcode = Column(String, unique=True, index=True)
+    
+    # Additional pharmacy management fields
+    sku = Column(String, unique=True, index=True)  # Stock Keeping Unit
+    pack_size = Column(String)  # e.g., "10 tablets", "100ml bottle"
+    hsn_code = Column(String)  # HSN/SAC code for taxation
+    mrp = Column(Float)  # Maximum Retail Price
+    purchase_price = Column(Float)  # Default purchase price
+    selling_price = Column(Float)  # Default selling price
+    tax_percent = Column(Float, default=0.0)  # Tax percentage
+    stock_quantity = Column(Integer, default=0)  # Current stock quantity
+    reorder_level = Column(Integer, default=10)  # Reorder level
+    storage_condition = Column(String)  # Storage conditions (e.g., "Cool dry place")
+    schedule = Column(String)  # Drug schedule (e.g., H1, H2, Schedule X)
+    alternative_drug_names = Column(Text)  # Alternative drug names (comma separated)
+    substitution_allowed = Column(Boolean, default=True)  # Whether substitution is allowed
+    location = Column(String)  # Storage location in pharmacy
+    notes = Column(Text)  # Additional notes
+    
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -268,10 +287,12 @@ class Refund(Base):
     __tablename__ = "refunds"
     
     id = Column(Integer, primary_key=True, index=True)
+    refund_number = Column(String, unique=True, index=True, nullable=False)
     invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
     amount = Column(Float, nullable=False)
     reason = Column(Text, nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    refund_date = Column(DateTime(timezone=True), server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
@@ -311,3 +332,22 @@ class Notification(Base):
     
     # Relationships
     recipient = relationship("User")
+
+# Hold Bill Model for POS
+class HoldBill(Base):
+    __tablename__ = "hold_bills"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    hold_number = Column(String, unique=True, index=True, nullable=False)
+    cart_data = Column(Text, nullable=False)  # JSON data for cart
+    customer_info = Column(Text)  # JSON data for customer
+    held_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    held_at = Column(DateTime(timezone=True), server_default=func.now())
+    hold_reason = Column(Text)
+    is_active = Column(Boolean, default=True)
+    released_at = Column(DateTime(timezone=True))
+    released_by = Column(Integer, ForeignKey("users.id"))
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[held_by])
+    released_by_user = relationship("User", foreign_keys=[released_by])

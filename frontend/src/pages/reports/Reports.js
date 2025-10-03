@@ -1,17 +1,384 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useQuery } from 'react-query';
+import { Link } from 'react-router-dom';
+import { api, endpoints } from '../../services/api';
+import {
+  ChartBarIcon,
+  DocumentTextIcon,
+  CurrencyDollarIcon,
+  UserIcon,
+  CubeIcon,
+  CalendarIcon,
+  ArrowDownTrayIcon,
+  ClockIcon,
+  ExclamationTriangleIcon
+} from '@heroicons/react/24/outline';
+import Loader from '../../components/Loader';
 
 const Reports = () => {
+  const [selectedReport, setSelectedReport] = useState('sales');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+
+  const { data: salesData, isLoading: salesLoading, error: salesError } = useQuery(
+    'sales-report',
+    () => api.get(endpoints.REPORTS.SALES).then(res => res.data),
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const { data: patientStats, error: patientError } = useQuery(
+    'patient-stats',
+    () => api.get(endpoints.REPORTS.PATIENTS).then(res => res.data),
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const { data: inventoryStats, error: inventoryError } = useQuery(
+    'inventory-stats',
+    () => api.get(endpoints.REPORTS.INVENTORY).then(res => res.data),
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const reportTypes = [
+    { id: 'sales', name: 'Sales Report', icon: CurrencyDollarIcon },
+    { id: 'patients', name: 'Patient Report', icon: UserIcon },
+    { id: 'inventory', name: 'Inventory Report', icon: CubeIcon },
+    { id: 'financial', name: 'Financial Report', icon: ChartBarIcon },
+    { id: 'prescriptions', name: 'Prescription Report', icon: DocumentTextIcon },
+  ];
+
+  const generateReport = (reportType) => {
+    setSelectedReport(reportType);
+    // In a real implementation, this would trigger the report generation
+  };
+
+  const downloadReport = (reportType) => {
+    // In a real implementation, this would trigger the report download
+    console.log(`Downloading ${reportType} report...`);
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  };
+
   return (
     <div className="px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Generate and view various reports.
-        </p>
+      {(salesError || patientError || inventoryError) && (
+        <div className="mb-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700">
+          <p className="text-sm">
+            <span className="font-medium">Warning:</span> Some report data is unavailable.
+            {(salesError?.response?.status === 401 || patientError?.response?.status === 401 || inventoryError?.response?.status === 401)
+              ? ' Please ensure the backend API is running and you are logged in.'
+              : ' Using default values where applicable.'}
+          </p>
+        </div>
+      )}
+      <div className="sm:flex sm:items-center">
+        <div className="sm:flex-auto">
+          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+          <p className="mt-2 text-sm text-gray-700">
+            Generate and view various reports.
+          </p>
+        </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg p-6">
-        <p className="text-gray-600">Reports component will be implemented here.</p>
+      {/* Report Type Selection */}
+      <div className="mt-6">
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Select Report Type</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {reportTypes.map((report) => (
+            <button
+              key={report.id}
+              onClick={() => generateReport(report.id)}
+              className={`p-4 border rounded-lg text-left transition-colors ${
+                selectedReport === report.id
+                  ? 'border-primary-500 bg-primary-50'
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <report.icon className="h-6 w-6 text-gray-500" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-gray-900">{report.name}</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {report.id === 'sales' && 'View sales trends and revenue'}
+                    {report.id === 'patients' && 'Analyze patient demographics'}
+                    {report.id === 'inventory' && 'Track inventory levels and stock'}
+                    {report.id === 'financial' && 'Financial overview and summaries'}
+                    {report.id === 'prescriptions' && 'Prescription statistics and trends'}
+                  </p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Date Range Filter */}
+      <div className="mt-6 bg-white shadow rounded-lg p-6">
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Filter by Date Range</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="start-date" className="block text-sm font-medium text-gray-700">
+              Start Date
+            </label>
+            <input
+              type="date"
+              id="start-date"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+              value={dateRange.start}
+              onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
+            />
+          </div>
+          <div>
+            <label htmlFor="end-date" className="block text-sm font-medium text-gray-700">
+              End Date
+            </label>
+            <input
+              type="date"
+              id="end-date"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+              value={dateRange.end}
+              onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Report Preview */}
+      <div className="mt-6 bg-white shadow rounded-lg p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-medium text-gray-900">
+            {reportTypes.find(r => r.id === selectedReport)?.name} Preview
+          </h2>
+          <button
+            onClick={() => downloadReport(selectedReport)}
+            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+          >
+            <ArrowDownTrayIcon className="-ml-0.5 mr-1 h-4 w-4" />
+            Download
+          </button>
+        </div>
+
+        {selectedReport === 'sales' && (
+          <div>
+            {salesLoading ? (
+              <Loader text="Loading sales data..." />
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <CurrencyDollarIcon className="h-6 w-6 text-green-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Total Sales</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        ${salesData?.total_sales?.toFixed(2) || '0.00'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <DocumentTextIcon className="h-6 w-6 text-blue-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Total Orders</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {salesData?.total_orders || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <ClockIcon className="h-6 w-6 text-yellow-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Avg. Order Value</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        ${salesData?.avg_order_value?.toFixed(2) || '0.00'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <CalendarIcon className="h-6 w-6 text-purple-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Report Period</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {formatDate(salesData?.start_date)} - {formatDate(salesData?.end_date)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {selectedReport === 'patients' && (
+          <div>
+            {patientStats ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <UserIcon className="h-6 w-6 text-blue-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Total Patients</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {patientStats?.total_patients || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <CalendarIcon className="h-6 w-6 text-green-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">New Patients</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {patientStats?.new_patients || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <DocumentTextIcon className="h-6 w-6 text-purple-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Active Prescriptions</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {patientStats?.active_prescriptions || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No patient statistics available.</p>
+            )}
+          </div>
+        )}
+
+        {selectedReport === 'inventory' && (
+          <div>
+            {inventoryStats ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <CubeIcon className="h-6 w-6 text-blue-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Total Medicines</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {inventoryStats?.total_medicines || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Low Stock Items</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {inventoryStats?.low_stock_items || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <ClockIcon className="h-6 w-6 text-red-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Expiring Soon</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {inventoryStats?.expiring_soon || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <CurrencyDollarIcon className="h-6 w-6 text-green-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">Total Value</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        ${inventoryStats?.total_value?.toFixed(2) || '0.00'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No inventory statistics available.</p>
+            )}
+          </div>
+        )}
+
+        {selectedReport === 'financial' && (
+          <div>
+            <p className="text-sm text-gray-500 mb-4">Financial report will show comprehensive financial data including revenue, expenses, and profit margins.</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm font-medium text-gray-500">Total Revenue</p>
+                <p className="text-2xl font-bold text-gray-900">$0.00</p>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm font-medium text-gray-500">Total Expenses</p>
+                <p className="text-2xl font-bold text-gray-900">$0.00</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selectedReport === 'prescriptions' && (
+          <div>
+            <p className="text-sm text-gray-500 mb-4">Prescription report will show prescription statistics, trends, and analysis.</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm font-medium text-gray-500">Total Prescriptions</p>
+                <p className="text-2xl font-bold text-gray-900">0</p>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm font-medium text-gray-500">Completed</p>
+                <p className="text-2xl font-bold text-gray-900">0</p>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm font-medium text-gray-500">Pending</p>
+                <p className="text-2xl font-bold text-gray-900">0</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
