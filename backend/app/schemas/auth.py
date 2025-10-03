@@ -49,3 +49,12 @@ class RefreshTokenRequest(BaseModel):
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
+
+class StaffLoginRequest(BaseModel):
+    username: str
+    pin: str
+
+class StaffLoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: User

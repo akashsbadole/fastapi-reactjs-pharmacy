@@ -7,9 +7,9 @@ from typing import List
 
 from ..database import get_db
 from ..models import User, AuditLog
-from ..schemas.auth import User as UserSchema, UserCreate, UserUpdate, LoginRequest, Token, RefreshTokenRequest, PasswordChange
+from ..schemas.auth import User as UserSchema, UserCreate, UserUpdate, LoginRequest, Token, RefreshTokenRequest, PasswordChange, StaffLoginRequest, StaffLoginResponse
 from ..utils.auth import (
-    authenticate_user, create_access_token, create_refresh_token, verify_token,
+    authenticate_user, authenticate_staff, create_access_token, create_refresh_token, verify_token,
     get_password_hash, get_current_active_user, require_admin
 )
 from ..config import settings
@@ -290,3 +290,48 @@ async def update_user(
     db.commit()
     
     return db_user
+
+@router.post("/staff-login", response_model=StaffLoginResponse)
+async def staff_login(login_data: StaffLoginRequest, db: Session = Depends(get_db)):
+    try:
+        user = authenticate_staff(db, login_data.username, login_data.pin)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or PIN",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.username}, expires_delta=access_token_expires
+        )
+        
+        # Update last login
+        user.last_login = func.now()
+        db.commit()
+        
+        # Create audit log
+        try:
+            audit_log = AuditLog(
+                user_id=user.id,
+                action="STAFF_LOGIN",
+                resource_type="USER",
+                resource_id=user.id,
+                new_values=f"Staff {user.username} logged in with PIN"
+            )
+            db.add(audit_log)
+            db.commit()
+        except Exception as e:
+            print(f"Error creating audit log: {e}")
+            # Continue without audit log
+            pass
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": user
+        }
+    except Exception as e:
+        print(f"Staff login error: {e}")
+        raise

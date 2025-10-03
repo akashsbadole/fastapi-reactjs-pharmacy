@@ -55,6 +55,7 @@ export const endpoints = {
     ME: '/api/auth/me',
     CHANGE_PASSWORD: '/api/auth/change-password',
     USERS: '/api/auth/users',
+    STAFF_LOGIN: '/api/auth/staff-login',
   },
   
   // Patient endpoints
@@ -126,7 +127,6 @@ export const endpoints = {
     SEND_DIGITAL_RECEIPT: '/api/pos/send-digital-receipt',
     PRINT_BARCODES: '/api/pos/print-barcodes',
     SYNC_TRANSACTION: '/api/pos/sync-transaction',
-    STAFF_LOGIN: '/api/auth/staff-login',
     END_SHIFT: '/api/pos/end-shift',
   },
   

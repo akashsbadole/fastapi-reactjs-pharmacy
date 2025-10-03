@@ -70,6 +70,25 @@ def authenticate_user(db: Session, username: str, password: str) -> Union[bool, 
         return False
     return user
 
+def authenticate_staff(db: Session, username: str, pin: str) -> Union[bool, User]:
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        return False
+    if not user.pin:
+        return False
+    
+    # Try to verify the PIN using bcrypt directly
+    try:
+        import bcrypt
+        if bcrypt.checkpw(pin.encode('utf-8'), user.pin.encode('utf-8')):
+            return user
+    except Exception:
+        # Fallback to the regular password verification if bcrypt fails
+        if verify_password(pin, user.pin):
+            return user
+    
+    return False
+
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

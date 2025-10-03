@@ -141,6 +141,7 @@ const PointOfSale = () => {
   const [showUpsellPanel, setShowUpsellPanel] = useState(false);
   const [taxType, setTaxType] = useState('exclusive'); // exclusive or inclusive
   const [showStaffLoginModal, setShowStaffLoginModal] = useState(false);
+  const [staffUsername, setStaffUsername] = useState('');
   const [staffPin, setStaffPin] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [showCashReconciliationModal, setShowCashReconciliationModal] = useState(false);
@@ -1191,9 +1192,10 @@ const PointOfSale = () => {
   
   const processStaffLogin = async () => {
     try {
-      const response = await api.post('/api/auth/staff-login', { pin: staffPin });
+      const response = await api.post('/api/auth/staff-login', { username: staffUsername, pin: staffPin });
       setCurrentUser(response.data);
       setShowStaffLoginModal(false);
+      setStaffUsername('');
       setStaffPin('');
       toast.success('Staff login successful');
     } catch (error) {
@@ -1252,14 +1254,11 @@ const PointOfSale = () => {
     
     // Swipe left to remove item
     if (deltaX < -50) {
-      removeFromCart(itemIndex);
-      toast.success('Item removed from cart');
+      handleSwipeLeft(itemIndex);
     }
     // Swipe right to add notes
     else if (deltaX > 50) {
-      setNotesIndex(itemIndex);
-      setNotesType('item');
-      setShowNotesModal(true);
+      handleSwipeRight(itemIndex);
     }
     
     setTouchStartX(null);
@@ -1268,19 +1267,16 @@ const PointOfSale = () => {
   };
   
   // Swipe handlers for cart items
-  const getSwipeHandlers = (index) => ({
-    onSwipedLeft: () => {
-      removeFromCart(index);
-      toast.success('Item removed from cart');
-    },
-    onSwipedRight: () => {
-      setNotesIndex(index);
-      setNotesType('item');
-      setShowNotesModal(true);
-    },
-    preventDefaultTouchmoveEvent: true,
-    trackMouse: true
-  });
+  const handleSwipeLeft = (index) => {
+    removeFromCart(index);
+    toast.success('Item removed from cart');
+  };
+  
+  const handleSwipeRight = (index) => {
+    setNotesIndex(index);
+    setNotesType('item');
+    setShowNotesModal(true);
+  };
   
   return (
     <div className={`h-screen flex flex-col ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'}`}>
@@ -1781,7 +1777,6 @@ const PointOfSale = () => {
                 {cart.map((item, index) => (
                   <div
                     key={index}
-                    {...useSwipeable(getSwipeHandlers(index))}
                     className={`rounded-lg p-3 border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'} touch-manipulation transition-all duration-200 hover:shadow-md`}
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
@@ -3454,7 +3449,21 @@ const PointOfSale = () => {
             <div className="space-y-4">
               <div>
                 <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Enter Staff PIN
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={staffUsername}
+                  onChange={(e) => setStaffUsername(e.target.value)}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                  }`}
+                  placeholder="Enter username"
+                />
+              </div>
+              <div>
+                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                  PIN
                 </label>
                 <input
                   type="password"
@@ -3472,6 +3481,7 @@ const PointOfSale = () => {
               <button
                 onClick={() => {
                   setShowStaffLoginModal(false);
+                  setStaffUsername('');
                   setStaffPin('');
                 }}
                 className={`px-4 py-2 border rounded-md ${
@@ -3484,7 +3494,7 @@ const PointOfSale = () => {
               </button>
               <button
                 onClick={processStaffLogin}
-                disabled={staffPin.length !== 4}
+                disabled={!staffUsername || staffPin.length !== 4}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
                 Login

@@ -229,6 +229,13 @@ For testing purposes, you can use these default credentials:
 - **Pharmacist**: username: `pharmacist`, password: `pharm123`
 - **Cashier**: username: `cashier`, password: `cash123`
 
+*PIN*
+Found 3 users without PINs.
+- Added PIN '1234' for user: admin (ID: 1)
+- Added PIN '5678' for user: pharmacist (ID: 2)
+- Added PIN '9012' for user: cashier (ID: 3)
+Successfully added PINs to all users.
+
 ## API Documentation
 
 Once the backend is running, you can access the interactive API documentation at:
@@ -333,6 +340,102 @@ This project is licensed under the MIT License.
 - **Integration APIs**: Third-party integrations with accounting and EMS systems
 - **Multi-Store Support**: Chain pharmacy management capabilities
 - **AI-Powered Features**: Drug interaction checking and dosage recommendations
+
+### Additional Suggested Modules
+
+- User & Role Management: Admin, Pharmacist, Cashier roles with permissions
+- Audit Trails: Full activity logs for compliance
+- Security & Backup: Automated cloud backups, encryption
+- Mobile App/Responsive: Mobile POS for home delivery staff
+- Delivery Management: Manage home deliveries & riders
+- SMS/Email Integration: Automated notifications for refills, bills
+- Supplier Portal: Vendors can upload invoices or check PO status
+- Regulatory Compliance: Schedule H, X, NDPS tracking
+- Analytics Dashboard: Forecasting, top-selling drugs, demand trends
+
+
+#### Settings Menu
+1️⃣ Organization / Pharmacy Settings
+
+Store Name, Address, Logo, Contact info
+
+Tax/GST numbers, HSN code defaults
+
+Default currency, time zone, date formats
+
+Invoice numbering format & prefixes
+
+Prescription numbering format
+
+2️⃣ User & Roles Management
+
+Add/Edit Users (Admin, Pharmacist, Cashier, Accountant)
+
+Role-based permissions (who can view/edit/approve)
+
+2FA / password policies
+
+3️⃣ POS Settings
+
+Default payment methods
+
+Enable/disable barcode scanning
+
+Receipt/invoice print layout & branding
+
+Default discount/tax configuration
+
+Counter/terminal setup
+
+4️⃣ Inventory Settings
+
+Reorder level defaults
+
+Expiry alerts (how many days in advance)
+
+Alternative medicine mapping rules
+
+Batch-wise pricing toggle
+
+5️⃣ Notifications / Communication
+
+Email/SMS gateway setup
+
+Templates for invoices, reminders, refill alerts
+
+WhatsApp integration API keys
+
+6️⃣ Integration Settings
+
+Insurance provider integration
+
+E-prescription provider integration
+
+Accounting software sync (Tally, QuickBooks, Zoho)
+
+Payment gateway setup (UPI, cards)
+
+7️⃣ Compliance & Regulations
+
+Schedule H, X, NDPS tracking settings
+
+Upload license & certificates
+
+Audit log retention period
+
+8️⃣ Backup & Data
+
+Automatic backups (local/cloud)
+
+Data import/export (CSV, JSON, XML)
+
+GDPR/data privacy options
+
+9️⃣ Theme & UI
+
+Color theme selection (dark/light mode)
+
+Logo, favicon, branding customization
 
 ## Support
 
