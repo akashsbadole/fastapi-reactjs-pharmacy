@@ -147,6 +147,7 @@ export const endpoints = {
     SUPPLIERS: '/api/reports/suppliers',
     AUDIT_LOGS: '/api/reports/audit-logs',
     GENERATE: '/api/reports/generate',
+    DOWNLOAD: (reportType) => `/api/reports/download/${reportType}`,
   },
   
   // Settings endpoints
@@ -208,6 +209,11 @@ api.interceptors.response.use(
                 // Retry the original request with new token
                 originalRequest.headers.Authorization = `Bearer ${access_token}`;
                 return api(originalRequest);
+              } else {
+                // No refresh token available, redirect to login
+                localStorage.removeItem('token');
+                localStorage.removeItem('refreshToken');
+                window.location.href = '/login';
               }
             } catch (refreshError) {
               // Refresh failed, clear tokens and redirect to login
@@ -215,6 +221,11 @@ api.interceptors.response.use(
               localStorage.removeItem('refreshToken');
               window.location.href = '/login';
             }
+          } else {
+            // Already tried to refresh and failed, redirect to login
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            window.location.href = '/login';
           }
           break;
         case 403:

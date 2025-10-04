@@ -38,6 +38,12 @@ import AddPayment from './pages/billing/AddPayment';
 import InvoiceDetails from './pages/billing/InvoiceDetails';
 import PointOfSale from './pages/pos/PointOfSale';
 import Reports from './pages/reports/Reports';
+import AuditLogs from './pages/audit/AuditLogs';
+import AuditLogDetails from './pages/audit/AuditLogDetails';
+import HelpSupport from './pages/support/HelpSupport';
+import SupportTickets from './pages/support/SupportTickets';
+import KnowledgeBaseArticleDetails from './pages/support/KnowledgeBaseArticleDetails';
+import Subscription from './pages/subscription/Subscription';
 import Users from './pages/users/Users';
 import CreateUser from './pages/users/CreateUser';
 import UserDetails from './pages/users/UserDetails';
@@ -114,6 +120,18 @@ function App() {
                 
                 {/* Reports routes */}
                 <Route path="reports" element={<Reports />} />
+                
+                {/* Audit routes */}
+                <Route path="audit" element={<AuditLogs />} />
+                <Route path="audit/:id" element={<AuditLogDetails />} />
+                
+                {/* Support routes */}
+                <Route path="support" element={<HelpSupport />} />
+                <Route path="support/tickets" element={<SupportTickets />} />
+                <Route path="support/knowledge-base/:id" element={<KnowledgeBaseArticleDetails />} />
+                
+                {/* Subscription routes */}
+                <Route path="subscription" element={<Subscription />} />
                 
                 {/* User management */}
                 <Route path="users" element={<Users />} />

@@ -9,6 +9,9 @@ import {
   DocumentTextIcon,
   CreditCardIcon,
   ChartBarIcon,
+  ShieldCheckIcon,
+  QuestionMarkCircleIcon,
+  CurrencyDollarIcon,
   CogIcon,
   ArrowRightOnRectangleIcon,
   Bars3Icon,
@@ -54,6 +57,9 @@ const Layout = () => {
     { name: 'Prescriptions', href: '/prescriptions', icon: DocumentTextIcon },
     { name: 'Billing', href: '/billing', icon: CreditCardIcon },
     { name: 'Reports', href: '/reports', icon: ChartBarIcon },
+    { name: 'Audit Logs', href: '/audit', icon: ShieldCheckIcon },
+    { name: 'Subscription', href: '/subscription', icon: CurrencyDollarIcon },
+    { name: 'Help & Support', href: '/support', icon: QuestionMarkCircleIcon },
   ];
 
   // Add user management for admin users

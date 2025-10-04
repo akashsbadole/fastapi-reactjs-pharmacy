@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_, desc, case
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta
+import csv
+import io
+from fastapi.responses import StreamingResponse
 
 from ..database import get_db
 from ..models import (
@@ -736,3 +739,282 @@ async def generate_custom_report(
         generated_at=datetime.utcnow(),
         data=report_data
     )
+
+@router.get("/download/{report_type}")
+async def download_report(
+    report_type: str,
+    period: str = Query("week", description="Period: day, week, month, year"),
+    date_from: Optional[date] = Query(None, description="Start date for custom date range"),
+    date_to: Optional[date] = Query(None, description="End date for custom date range"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Download a report as CSV file
+    """
+    try:
+        # Validate report type
+        valid_report_types = ["sales", "inventory", "patients", "financial", "prescriptions"]
+        if report_type not in valid_report_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid report type. Must be one of: {', '.join(valid_report_types)}"
+            )
+        
+        # Calculate date range
+        if date_from and date_to:
+            start_date = datetime.combine(date_from, datetime.min.time())
+            end_date = datetime.combine(date_to, datetime.max.time())
+        else:
+            end_date = datetime.utcnow()
+            if period == "day":
+                start_date = end_date - timedelta(days=1)
+            elif period == "week":
+                start_date = end_date - timedelta(weeks=1)
+            elif period == "month":
+                start_date = end_date - timedelta(days=30)
+            elif period == "year":
+                start_date = end_date - timedelta(days=365)
+            else:
+                start_date = end_date - timedelta(weeks=1)
+        
+        # Generate CSV content based on report type
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        if report_type == "sales":
+            # Sales report CSV
+            writer.writerow([
+                "Date", "Invoice ID", "Patient Name", "Total Amount", "Payment Mode",
+                "Payment Status", "Created By"
+            ])
+            
+            sales_data = db.query(
+                func.date(Invoice.created_at).label('date'),
+                Invoice.id,
+                Patient.first_name,
+                Patient.last_name,
+                Invoice.total_amount,
+                Invoice.payment_mode,
+                Invoice.payment_status,
+                User.username
+            ).join(
+                Patient, Invoice.patient_id == Patient.id, isouter=True
+            ).join(
+                User, Invoice.created_by == User.id, isouter=True
+            ).filter(
+                and_(
+                    Invoice.created_at >= start_date,
+                    Invoice.created_at <= end_date
+                )
+            ).all()
+            
+            for data in sales_data:
+                patient_name = f"{data.first_name or ''} {data.last_name or ''}".strip()
+                writer.writerow([
+                    data.date,
+                    data.id,
+                    patient_name,
+                    data.total_amount,
+                    data.payment_mode,
+                    data.payment_status,
+                    data.username or ""
+                ])
+            
+            filename = f"sales_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            
+        elif report_type == "inventory":
+            # Inventory report CSV
+            writer.writerow([
+                "Medicine Name", "Batch Number", "Current Stock", "Cost Price",
+                "Selling Price", "Expiry Date", "Supplier Name", "Low Stock Threshold"
+            ])
+            
+            inventory_data = db.query(
+                Medicine.name,
+                MedicineBatch.batch_number,
+                MedicineBatch.current_stock,
+                MedicineBatch.cost_price,
+                MedicineBatch.selling_price,
+                MedicineBatch.expiry_date,
+                Supplier.name.label('supplier_name'),
+                MedicineBatch.low_stock_threshold
+            ).join(
+                MedicineBatch, Medicine.id == MedicineBatch.medicine_id
+            ).join(
+                Supplier, MedicineBatch.supplier_id == Supplier.id, isouter=True
+            ).filter(
+                and_(
+                    Medicine.is_active == True,
+                    MedicineBatch.is_active == True
+                )
+            ).all()
+            
+            for data in inventory_data:
+                writer.writerow([
+                    data.name,
+                    data.batch_number,
+                    data.current_stock,
+                    data.cost_price,
+                    data.selling_price,
+                    data.expiry_date,
+                    data.supplier_name or "",
+                    data.low_stock_threshold
+                ])
+            
+            filename = f"inventory_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            
+        elif report_type == "patients":
+            # Patients report CSV
+            writer.writerow([
+                "Patient ID", "First Name", "Last Name", "Date of Birth", "Gender",
+                "Phone", "Email", "Address", "Registration Date", "Total Prescriptions"
+            ])
+            
+            patients_data = db.query(
+                Patient.id,
+                Patient.first_name,
+                Patient.last_name,
+                Patient.date_of_birth,
+                Patient.gender,
+                Patient.phone,
+                Patient.email,
+                Patient.address,
+                Patient.created_at,
+                func.count(Prescription.id).label('prescription_count')
+            ).outerjoin(
+                Prescription, Patient.id == Prescription.patient_id
+            ).filter(
+                Patient.is_active == True
+            ).group_by(Patient.id).all()
+            
+            for data in patients_data:
+                writer.writerow([
+                    data.id,
+                    data.first_name,
+                    data.last_name,
+                    data.date_of_birth,
+                    data.gender,
+                    data.phone,
+                    data.email,
+                    data.address,
+                    data.created_at,
+                    data.prescription_count
+                ])
+            
+            filename = f"patients_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            
+        elif report_type == "financial":
+            # Financial report CSV
+            writer.writerow([
+                "Date", "Invoice ID", "Total Revenue", "Total Cost", "Profit",
+                "Payment Mode", "Profit Margin (%)"
+            ])
+            
+            financial_data = db.query(
+                func.date(Invoice.created_at).label('date'),
+                Invoice.id,
+                Invoice.total_amount,
+                func.sum(InvoiceItem.quantity * MedicineBatch.cost_price).label('total_cost'),
+                Invoice.payment_mode
+            ).join(
+                InvoiceItem, Invoice.id == InvoiceItem.invoice_id
+            ).join(
+                MedicineBatch, InvoiceItem.batch_id == MedicineBatch.id
+            ).filter(
+                and_(
+                    Invoice.created_at >= start_date,
+                    Invoice.created_at <= end_date,
+                    Invoice.payment_status == 'PAID'
+                )
+            ).group_by(Invoice.id).all()
+            
+            for data in financial_data:
+                profit = (data.total_amount or 0) - (data.total_cost or 0)
+                profit_margin = (profit / data.total_amount * 100) if data.total_amount > 0 else 0
+                writer.writerow([
+                    data.date,
+                    data.id,
+                    data.total_amount,
+                    data.total_cost,
+                    profit,
+                    data.payment_mode,
+                    round(profit_margin, 2)
+                ])
+            
+            filename = f"financial_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            
+        elif report_type == "prescriptions":
+            # Prescriptions report CSV
+            writer.writerow([
+                "Prescription ID", "Patient Name", "Doctor Name", "Prescription Date",
+                "Status", "Medicines", "Total Items"
+            ])
+            
+            prescriptions_data = db.query(
+                Prescription.id,
+                Patient.first_name,
+                Patient.last_name,
+                Prescription.doctor_name,
+                Prescription.created_at,
+                Prescription.status,
+                func.count(PrescriptionItem.id).label('total_items')
+            ).join(
+                Patient, Prescription.patient_id == Patient.id
+            ).join(
+                PrescriptionItem, Prescription.id == PrescriptionItem.prescription_id
+            ).filter(
+                Prescription.created_at >= start_date
+            ).group_by(Prescription.id).all()
+            
+            for data in prescriptions_data:
+                # Get medicines for this prescription
+                medicines = db.query(
+                    Medicine.name,
+                    PrescriptionItem.quantity
+                ).join(
+                    PrescriptionItem, Medicine.id == PrescriptionItem.medicine_id
+                ).filter(
+                    PrescriptionItem.prescription_id == data.id
+                ).all()
+                
+                medicines_str = "; ".join([f"{med.name} ({med.quantity})" for med in medicines])
+                
+                patient_name = f"{data.first_name} {data.last_name}"
+                writer.writerow([
+                    data.id,
+                    patient_name,
+                    data.doctor_name,
+                    data.created_at,
+                    data.status,
+                    medicines_str,
+                    data.total_items
+                ])
+            
+            filename = f"prescriptions_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        
+        # Create response
+        output.seek(0)
+        response = StreamingResponse(
+            io.BytesIO(output.getvalue().encode('utf-8')),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+        # Create audit log
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            action="EXPORT",
+            resource_type=f"{report_type.upper()}_REPORT",
+            new_values=f"Downloaded {report_type} report for period {period}"
+        )
+        db.add(audit_log)
+        db.commit()
+        
+        return response
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating report: {str(e)}"
+        )

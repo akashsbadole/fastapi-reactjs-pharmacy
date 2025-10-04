@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from 'react-query';
 import { Link } from 'react-router-dom';
-import { api, endpoints } from '../../services/api';
+import { api, endpoints, apiHelpers } from '../../services/api';
 import {
   ChartBarIcon,
   DocumentTextIcon,
@@ -51,6 +51,14 @@ const Reports = () => {
     }
   );
 
+  const { data: financialStats, error: financialError } = useQuery(
+    'financial-stats',
+    () => api.get(endpoints.REPORTS.FINANCIAL).then(res => res.data),
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
+
   const reportTypes = [
     { id: 'sales', name: 'Sales Report', icon: CurrencyDollarIcon },
     { id: 'patients', name: 'Patient Report', icon: UserIcon },
@@ -64,9 +72,30 @@ const Reports = () => {
     // In a real implementation, this would trigger the report generation
   };
 
-  const downloadReport = (reportType) => {
-    // In a real implementation, this would trigger the report download
-    console.log(`Downloading ${reportType} report...`);
+  const downloadReport = async (reportType) => {
+    try {
+      // Get date range from state
+      const params = new URLSearchParams();
+      params.append('period', 'week'); // Default to week, could be made configurable
+      
+      if (dateRange.start) {
+        params.append('date_from', dateRange.start);
+      }
+      
+      if (dateRange.end) {
+        params.append('date_to', dateRange.end);
+      }
+      
+      // Download the report
+      await apiHelpers.downloadCSV(
+        `${endpoints.REPORTS.DOWNLOAD(reportType)}?${params.toString()}`,
+        `${reportType}_report_${new Date().toISOString().split('T')[0]}.csv`
+      );
+    } catch (error) {
+      console.error('Error downloading report:', error);
+      // Show error message to user
+      alert('Failed to download report. Please try again.');
+    }
   };
 
   const formatDate = (dateString) => {
@@ -77,11 +106,11 @@ const Reports = () => {
 
   return (
     <div className="px-4 py-6 sm:px-6 lg:px-8">
-      {(salesError || patientError || inventoryError) && (
+      {(salesError || patientError || inventoryError || financialError) && (
         <div className="mb-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700">
           <p className="text-sm">
             <span className="font-medium">Warning:</span> Some report data is unavailable.
-            {(salesError?.response?.status === 401 || patientError?.response?.status === 401 || inventoryError?.response?.status === 401)
+            {(salesError?.response?.status === 401 || patientError?.response?.status === 401 || inventoryError?.response?.status === 401 || financialError?.response?.status === 401)
               ? ' Please ensure the backend API is running and you are logged in.'
               : ' Using default values where applicable.'}
           </p>
@@ -446,17 +475,100 @@ const Reports = () => {
 
         {selectedReport === 'financial' && (
           <div>
-            <p className="text-sm text-gray-500 mb-4">Financial report will show comprehensive financial data including revenue, expenses, and profit margins.</p>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm font-medium text-gray-500">Total Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">$0.00</p>
+            {financialStats ? (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <CurrencyDollarIcon className="h-6 w-6 text-green-500" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Total Revenue</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          ${(financialStats?.total_revenue || 0).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <ChartBarIcon className="h-6 w-6 text-red-500" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Total Cost</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          ${(financialStats?.total_cost || 0).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <DocumentTextIcon className="h-6 w-6 text-blue-500" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Gross Profit</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          ${(financialStats?.gross_profit || 0).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <ClockIcon className="h-6 w-6 text-purple-500" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Profit Margin</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {(financialStats?.profit_margin || 0).toFixed(2)}%
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Payment Breakdown */}
+                <div className="mt-6">
+                  <h3 className="text-md font-medium text-gray-900 mb-3">Revenue by Payment Mode</h3>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {Object.entries(financialStats?.revenue_by_payment_mode || {}).map(([mode, amount]) => (
+                      <div key={mode} className="bg-gray-50 p-4 rounded-lg">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <CurrencyDollarIcon className="h-6 w-6 text-green-500" />
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-500">{mode}</p>
+                            <p className="text-lg font-semibold text-gray-900">
+                              ${(amount || 0).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm font-medium text-gray-500">Total Expenses</p>
-                <p className="text-2xl font-bold text-gray-900">$0.00</p>
+            ) : (
+              <div>
+                <p className="text-sm text-gray-500 mb-4">Financial report will show comprehensive financial data including revenue, expenses, and profit margins.</p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm font-medium text-gray-500">Total Revenue</p>
+                    <p className="text-2xl font-bold text-gray-900">$0.00</p>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm font-medium text-gray-500">Total Expenses</p>
+                    <p className="text-2xl font-bold text-gray-900">$0.00</p>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 

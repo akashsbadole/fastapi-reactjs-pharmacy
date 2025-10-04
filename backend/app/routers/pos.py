@@ -639,13 +639,13 @@ async def get_pos_config(
 
 @router.get("/summary/daily", response_model=POSDailySummary)
 async def get_daily_summary(
-    date: Optional[date] = Query(None, description="Date for summary (default: today)"),
+    target_date_param: Optional[date] = Query(None, description="Date for summary (default: today)"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Get daily sales summary for POS"""
     try:
-        target_date = date or date.today()
+        target_date = target_date_param or date.today()
         start_datetime = datetime.combine(target_date, datetime.min.time())
         end_datetime = datetime.combine(target_date, datetime.max.time())
         
@@ -653,10 +653,10 @@ async def get_daily_summary(
         sales_data = db.query(
             func.sum(Invoice.total_amount).label('total_sales'),
             func.count(Invoice.id).label('total_invoices'),
-            func.sum(case([(Invoice.payment_mode == 'CASH', Invoice.total_amount)], else_=0)).label('cash_sales'),
-            func.sum(case([(Invoice.payment_mode == 'CARD', Invoice.total_amount)], else_=0)).label('card_sales'),
-            func.sum(case([(Invoice.payment_mode == 'INSURANCE', Invoice.total_amount)], else_=0)).label('insurance_sales'),
-            func.sum(case([(Invoice.payment_mode == 'ONLINE', Invoice.total_amount)], else_=0)).label('online_sales')
+            func.sum(case((Invoice.payment_mode == 'CASH', Invoice.total_amount), else_=0)).label('cash_sales'),
+            func.sum(case((Invoice.payment_mode == 'CARD', Invoice.total_amount), else_=0)).label('card_sales'),
+            func.sum(case((Invoice.payment_mode == 'INSURANCE', Invoice.total_amount), else_=0)).label('insurance_sales'),
+            func.sum(case((Invoice.payment_mode == 'ONLINE', Invoice.total_amount), else_=0)).label('online_sales')
         ).filter(
             and_(
                 Invoice.created_at >= start_datetime,
@@ -717,7 +717,7 @@ async def get_daily_summary(
         print(f"Error in get_daily_summary: {str(e)}")
         # Return a default response instead of 500 error
         return POSDailySummary(
-            date=date or date.today(),
+            date=target_date_param or date.today(),
             total_sales=0,
             total_invoices=0,
             cash_sales=0,

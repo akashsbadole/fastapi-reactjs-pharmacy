@@ -470,6 +470,166 @@ class ComplianceSettings(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+# Support Ticket Model
+class SupportTicket(Base):
+    __tablename__ = "support_tickets"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    subject = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    category = Column(String, nullable=False)
+    priority = Column(String, default="Medium")  # Low, Medium, High, Critical
+    status = Column(String, default="Open")  # Open, In Progress, Resolved, Closed
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User")
+
+# Knowledge Base Article Model
+class KnowledgeBaseArticle(Base):
+    __tablename__ = "knowledge_base_articles"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    category = Column(String, nullable=False)
+    tags = Column(String)  # JSON string of tags
+    is_published = Column(Boolean, default=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    author = relationship("User")
+
+# Support Contact Model
+class SupportContact(Base):
+    __tablename__ = "support_contacts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    phone = Column(String)
+    department = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# Support Resource Model
+class SupportResource(Base):
+    __tablename__ = "support_resources"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    resource_type = Column(String, nullable=False)  # VIDEO, DOCUMENT, LINK
+    url = Column(String)  # For links or videos
+    file_path = Column(String)  # For documents
+    category = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# Subscription Plan Model
+class SubscriptionPlan(Base):
+    __tablename__ = "subscription_plans"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    price = Column(Integer, nullable=False)  # Price in cents
+    billing_cycle = Column(String, nullable=False)  # MONTHLY, YEARLY
+    features = Column(String)  # JSON string of features
+    is_active = Column(Boolean, default=True)
+    max_users = Column(Integer)  # Maximum number of users allowed
+    max_pharmacies = Column(Integer)  # Maximum number of pharmacies allowed
+    storage_limit_gb = Column(Integer)  # Storage limit in GB
+    support_level = Column(String, default="Standard")  # Basic, Standard, Premium
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user_subscriptions = relationship("UserSubscription", back_populates="plan")
+
+# User Subscription Model
+class UserSubscription(Base):
+    __tablename__ = "user_subscriptions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    plan_id = Column(Integer, ForeignKey("subscription_plans.id"), nullable=False)
+    status = Column(String, default="ACTIVE")  # ACTIVE, CANCELLED, EXPIRED, PENDING
+    start_date = Column(DateTime(timezone=True), nullable=False)
+    end_date = Column(DateTime(timezone=True), nullable=False)
+    auto_renew = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User")
+    plan = relationship("SubscriptionPlan", back_populates="user_subscriptions")
+    invoices = relationship("SubscriptionInvoice", back_populates="subscription")
+
+# Payment Method Model
+class PaymentMethod(Base):
+    __tablename__ = "payment_methods"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    method_type = Column(String, nullable=False)  # CREDIT_CARD, PAYPAL, BANK_TRANSFER
+    last_four = Column(String)  # Last 4 digits of card or account
+    expiry_month = Column(Integer)  # For credit cards
+    expiry_year = Column(Integer)  # For credit cards
+    cardholder_name = Column(String)  # For credit cards
+    is_default = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User")
+    subscription_payments = relationship("SubscriptionPayment", back_populates="payment_method")
+
+# Subscription Invoice Model
+class SubscriptionInvoice(Base):
+    __tablename__ = "subscription_invoices"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    subscription_id = Column(Integer, ForeignKey("user_subscriptions.id"), nullable=False)
+    invoice_number = Column(String, unique=True, nullable=False)
+    amount = Column(Integer, nullable=False)  # Amount in cents
+    due_date = Column(DateTime(timezone=True), nullable=False)
+    status = Column(String, default="PENDING")  # PENDING, PAID, OVERDUE, CANCELLED
+    description = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    paid_at = Column(DateTime(timezone=True))
+    
+    # Relationships
+    user = relationship("User")
+    subscription = relationship("UserSubscription", back_populates="invoices")
+    payments = relationship("SubscriptionPayment", back_populates="invoice")
+
+# Subscription Payment Model
+class SubscriptionPayment(Base):
+    __tablename__ = "subscription_payments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, ForeignKey("subscription_invoices.id"), nullable=False)
+    amount = Column(Integer, nullable=False)  # Amount in cents
+    payment_method_id = Column(Integer, ForeignKey("payment_methods.id"), nullable=False)
+    status = Column(String, default="PENDING")  # PENDING, COMPLETED, FAILED, REFUNDED
+    transaction_id = Column(String)  # External transaction ID
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    invoice = relationship("SubscriptionInvoice", back_populates="payments")
+    payment_method = relationship("PaymentMethod", back_populates="subscription_payments")
+
 # Backup Settings Model
 class BackupSettings(Base):
     __tablename__ = "backup_settings"
