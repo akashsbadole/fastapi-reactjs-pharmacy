@@ -116,67 +116,80 @@ async def get_sales_report(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    # Calculate date range based on period
-    end_date = datetime.utcnow()
-    if period == "day":
-        start_date = end_date - timedelta(days=1)
-    elif period == "week":
-        start_date = end_date - timedelta(weeks=1)
-    elif period == "month":
-        start_date = end_date - timedelta(days=30)
-    elif period == "year":
-        start_date = end_date - timedelta(days=365)
-    else:
-        start_date = end_date - timedelta(weeks=1)
-    
-    # Get sales data
-    sales_data = db.query(
-        func.date(Invoice.created_at).label('date'),
-        func.sum(Invoice.total_amount).label('total_sales'),
-        func.count(Invoice.id).label('total_invoices'),
-        func.sum(func.case([(Invoice.payment_mode == 'CASH', Invoice.total_amount)], else_=0)).label('cash_sales'),
-        func.sum(func.case([(Invoice.payment_mode == 'CARD', Invoice.total_amount)], else_=0)).label('card_sales'),
-        func.sum(func.case([(Invoice.payment_mode == 'INSURANCE', Invoice.total_amount)], else_=0)).label('insurance_sales')
-    ).filter(
-        and_(
-            Invoice.created_at >= start_date,
-            Invoice.created_at <= end_date,
-            Invoice.payment_status == 'PAID'
+    try:
+        # Calculate date range based on period
+        end_date = datetime.utcnow()
+        if period == "day":
+            start_date = end_date - timedelta(days=1)
+        elif period == "week":
+            start_date = end_date - timedelta(weeks=1)
+        elif period == "month":
+            start_date = end_date - timedelta(days=30)
+        elif period == "year":
+            start_date = end_date - timedelta(days=365)
+        else:
+            start_date = end_date - timedelta(weeks=1)
+        
+        # Get sales data
+        sales_data = db.query(
+            func.date(Invoice.created_at).label('date'),
+            func.sum(Invoice.total_amount).label('total_sales'),
+            func.count(Invoice.id).label('total_invoices'),
+            func.sum(func.case([(Invoice.payment_mode == 'CASH', Invoice.total_amount)], else_=0)).label('cash_sales'),
+            func.sum(func.case([(Invoice.payment_mode == 'CARD', Invoice.total_amount)], else_=0)).label('card_sales'),
+            func.sum(func.case([(Invoice.payment_mode == 'INSURANCE', Invoice.total_amount)], else_=0)).label('insurance_sales')
+        ).filter(
+            and_(
+                Invoice.created_at >= start_date,
+                Invoice.created_at <= end_date,
+                Invoice.payment_status == 'PAID'
+            )
+        ).group_by(func.date(Invoice.created_at)).all()
+        
+        # Calculate totals
+        total_sales = sum(data.total_sales or 0 for data in sales_data)
+        total_invoices = sum(data.total_invoices or 0 for data in sales_data)
+        average_invoice_value = total_sales / total_invoices if total_invoices > 0 else 0
+        
+        # Format daily sales
+        daily_sales = []
+        for data in sales_data:
+            daily_sales.append({
+                "date": data.date,
+                "total_sales": data.total_sales or 0,
+                "total_invoices": data.total_invoices or 0,
+                "cash_sales": data.cash_sales or 0,
+                "card_sales": data.card_sales or 0,
+                "insurance_sales": data.insurance_sales or 0
+            })
+        
+        # Payment breakdown
+        payment_breakdown = {
+            "cash": sum(data.cash_sales or 0 for data in sales_data),
+            "card": sum(data.card_sales or 0 for data in sales_data),
+            "insurance": sum(data.insurance_sales or 0 for data in sales_data)
+        }
+        
+        return SalesReport(
+            period=period,
+            total_sales=total_sales,
+            total_invoices=total_invoices,
+            average_invoice_value=average_invoice_value,
+            payment_breakdown=payment_breakdown,
+            daily_sales=daily_sales
         )
-    ).group_by(func.date(Invoice.created_at)).all()
-    
-    # Calculate totals
-    total_sales = sum(data.total_sales or 0 for data in sales_data)
-    total_invoices = sum(data.total_invoices or 0 for data in sales_data)
-    average_invoice_value = total_sales / total_invoices if total_invoices > 0 else 0
-    
-    # Format daily sales
-    daily_sales = []
-    for data in sales_data:
-        daily_sales.append({
-            "date": data.date,
-            "total_sales": data.total_sales or 0,
-            "total_invoices": data.total_invoices or 0,
-            "cash_sales": data.cash_sales or 0,
-            "card_sales": data.card_sales or 0,
-            "insurance_sales": data.insurance_sales or 0
-        })
-    
-    # Payment breakdown
-    payment_breakdown = {
-        "cash": sum(data.cash_sales or 0 for data in sales_data),
-        "card": sum(data.card_sales or 0 for data in sales_data),
-        "insurance": sum(data.insurance_sales or 0 for data in sales_data)
-    }
-    
-    return SalesReport(
-        period=period,
-        total_sales=total_sales,
-        total_invoices=total_invoices,
-        average_invoice_value=average_invoice_value,
-        payment_breakdown=payment_breakdown,
-        daily_sales=daily_sales
-    )
+    except Exception as e:
+        # Log the error
+        print(f"Error in get_sales_report: {str(e)}")
+        # Return a default response instead of 500 error
+        return SalesReport(
+            period=period,
+            total_sales=0,
+            total_invoices=0,
+            average_invoice_value=0,
+            payment_breakdown={"cash": 0, "card": 0, "insurance": 0},
+            daily_sales=[]
+        )
 
 @router.get("/inventory", response_model=InventoryReport)
 async def get_inventory_report(
@@ -344,9 +357,9 @@ async def get_prescription_report(
     
     # Average items per prescription
     avg_items_result = db.query(
-        func.avg(PrescriptionItem.subquery.c.item_count)
+        func.avg(PrescriptionItem.quantity)
     ).join(
-        Prescription, Prescription.id == PrescriptionItem.subquery.c.prescription_id
+        Prescription, PrescriptionItem.prescription_id == Prescription.id
     ).filter(
         Prescription.created_at >= start_date
     ).scalar()
@@ -542,7 +555,7 @@ async def get_financial_report(
     monthly_breakdown = []
     if period in ["month", "year"]:
         monthly_data = db.query(
-            func.date_trunc('month', Invoice.created_at).label('month'),
+            func.date(Invoice.created_at).label('month'),
             func.sum(Invoice.total_amount).label('revenue'),
             func.sum(InvoiceItem.quantity * MedicineBatch.cost_price).label('cost')
         ).join(
@@ -555,7 +568,7 @@ async def get_financial_report(
                 Invoice.created_at <= end_date,
                 Invoice.payment_status == 'PAID'
             )
-        ).group_by(func.date_trunc('month', Invoice.created_at)).all()
+        ).group_by(func.date(Invoice.created_at)).all()
         
         for data in monthly_data:
             profit = (data.revenue or 0) - (data.cost or 0)

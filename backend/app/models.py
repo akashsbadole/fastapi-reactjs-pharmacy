@@ -351,3 +351,147 @@ class HoldBill(Base):
     # Relationships
     user = relationship("User", foreign_keys=[held_by])
     released_by_user = relationship("User", foreign_keys=[released_by])
+
+# Organization Settings Model
+class OrganizationSettings(Base):
+    __tablename__ = "organization_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    store_name = Column(String, nullable=False, default="Pharmacy Store")
+    address = Column(String)
+    city = Column(String)
+    state = Column(String)
+    postal_code = Column(String)
+    country = Column(String)
+    phone = Column(String)
+    email = Column(String)
+    website = Column(String)
+    logo = Column(String)  # URL or base64 encoded image
+    tax_number = Column(String)
+    gst_number = Column(String)
+    hsn_code_default = Column(String, default="3004")
+    currency = Column(String, default="USD")
+    timezone = Column(String, default="UTC")
+    date_format = Column(String, default="MM/DD/YYYY")
+    time_format = Column(String, default="12-hour")
+    invoice_number_format = Column(String, default="INV-{YYYY}-{MM}-{SEQ}")
+    invoice_prefix = Column(String, default="INV")
+    prescription_number_format = Column(String, default="PRX-{YYYY}-{MM}-{SEQ}")
+    prescription_prefix = Column(String, default="PRX")
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# POS Settings Model
+class POSSettings(Base):
+    __tablename__ = "pos_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    payment_methods = Column(Text)  # JSON string
+    barcode_scanning = Column(Text)  # JSON string
+    receipt = Column(Text)  # JSON string
+    discount = Column(Text)  # JSON string
+    terminal = Column(Text)  # JSON string
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# Theme Settings Model
+class ThemeSettings(Base):
+    __tablename__ = "theme_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    theme_mode = Column(String, default="light")
+    color_scheme = Column(Text)  # JSON string
+    branding = Column(Text)  # JSON string
+    ui = Column(Text)  # JSON string
+    print = Column(Text)  # JSON string
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# Inventory Settings Model
+class InventorySettings(Base):
+    __tablename__ = "inventory_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    reorder_settings = Column(Text)  # JSON string
+    expiry_alerts = Column(Text)  # JSON string
+    low_stock_alerts = Column(Text)  # JSON string
+    alternatives = Column(Text)  # JSON string
+    batch_pricing = Column(Text)  # JSON string
+    stock_movement = Column(Text)  # JSON string
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# Notification Settings Model
+class NotificationSettings(Base):
+    __tablename__ = "notification_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    email_settings = Column(Text)  # JSON string
+    sms_settings = Column(Text)  # JSON string
+    whatsapp_settings = Column(Text)  # JSON string
+    notification_types = Column(Text)  # JSON string
+    templates = Column(Text)  # JSON string
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# Integration Settings Model
+class IntegrationSettings(Base):
+    __tablename__ = "integration_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    payment_gateway = Column(Text)  # JSON string
+    eprescription = Column(Text)  # JSON string
+    accounting = Column(Text)  # JSON string
+    insurance = Column(Text)  # JSON string
+    cloud_storage = Column(Text)  # JSON string
+    laboratory = Column(Text)  # JSON string
+    supplier_portal = Column(Text)  # JSON string
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# Compliance Settings Model
+class ComplianceSettings(Base):
+    __tablename__ = "compliance_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    regulatory = Column(Text)  # JSON string
+    licenses = Column(Text)  # JSON string
+    audit = Column(Text)  # JSON string
+    privacy = Column(Text)  # JSON string
+    prescription = Column(Text)  # JSON string
+    reporting = Column(Text)  # JSON string
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# Backup Settings Model
+class BackupSettings(Base):
+    __tablename__ = "backup_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    automatic_backup = Column(Text)  # JSON string
+    cloud_backup = Column(Text)  # JSON string
+    local_backup = Column(Text)  # JSON string
+    data_export = Column(Text)  # JSON string
+    data_import = Column(Text)  # JSON string
+    data_privacy = Column(Text)  # JSON string
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# User Roles Settings Model
+class UserRolesSettings(Base):
+    __tablename__ = "user_roles_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    roles = Column(Text)  # JSON string
+    permissions = Column(Text)  # JSON string
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())

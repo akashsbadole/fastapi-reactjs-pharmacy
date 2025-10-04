@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from 'react-query';
 import { Toaster } from 'react-hot-toast';
 
 import { AuthProvider } from './contexts/AuthContext';
+import { SettingsProvider } from './contexts/SettingsContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 
@@ -29,6 +30,7 @@ import SupplierDetails from './pages/inventory/SupplierDetails';
 import Prescriptions from './pages/prescriptions/Prescriptions';
 import PrescriptionDetails from './pages/prescriptions/PrescriptionDetails';
 import PrescriptionCreate from './pages/prescriptions/PrescriptionCreate';
+import PrescriptionEdit from './pages/prescriptions/PrescriptionEdit';
 import Billing from './pages/billing/Billing';
 import CreateInvoice from './pages/billing/CreateInvoice';
 import EditInvoice from './pages/billing/EditInvoice';
@@ -41,6 +43,7 @@ import CreateUser from './pages/users/CreateUser';
 import UserDetails from './pages/users/UserDetails';
 import EditUser from './pages/users/EditUser';
 import Profile from './pages/Profile';
+import Settings from './pages/settings/Settings';
 import NotFound from './pages/NotFound';
 
 // Create a client for React Query
@@ -57,7 +60,8 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router future={{ v7_relativeSplatPath: true }}>
+        <SettingsProvider>
+          <Router future={{ v7_relativeSplatPath: true }}>
           <div className="App">
             <Routes>
               {/* Public routes */}
@@ -96,6 +100,7 @@ function App() {
                 <Route path="prescriptions" element={<Prescriptions />} />
                 <Route path="prescriptions/create" element={<PrescriptionCreate />} />
                 <Route path="prescriptions/:id" element={<PrescriptionDetails />} />
+                <Route path="prescriptions/:id/edit" element={<PrescriptionEdit />} />
                 
                 {/* Billing routes */}
                 <Route path="billing" element={<Billing />} />
@@ -118,6 +123,9 @@ function App() {
                 
                 {/* Profile */}
                 <Route path="profile" element={<Profile />} />
+                
+                {/* Settings */}
+                <Route path="settings" element={<Settings />} />
               </Route>
               
               {/* 404 page */}
@@ -151,7 +159,8 @@ function App() {
             />
           </div>
         </Router>
-      </AuthProvider>
+      </SettingsProvider>
+    </AuthProvider>
     </QueryClientProvider>
   );
 }

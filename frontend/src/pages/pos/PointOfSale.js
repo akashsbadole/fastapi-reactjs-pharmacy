@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, endpoints } from '../../services/api';
 import '../../styles/print.css';
 import { useSwipeable } from 'react-swipeable';
+import { useSettings } from '../../contexts/SettingsContext';
 import {
   MagnifyingGlassIcon,
   ShoppingCartIcon,
@@ -64,6 +65,8 @@ import Loader from '../../components/Loader';
 const PointOfSale = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const settingsContext = useSettings() || { state: {} };
+  const { state: settingsState } = settingsContext;
   
   // State management
   const [searchQuery, setSearchQuery] = useState('');
@@ -148,9 +151,18 @@ const PointOfSale = () => {
   const [cashReconciliationData, setCashReconciliationData] = useState({
     expectedCash: 0,
     actualCash: 0,
+    cashSales: 0,
+    cardSales: 0,
+    upiSales: 0,
+    walletSales: 0,
+    otherSales: 0,
+    cashIn: 0,
+    cashOut: 0,
+    openingBalance: 0,
     difference: 0,
     notes: ''
   });
+  const [shiftSummary, setShiftSummary] = useState(null);
   
   // Refs
   const searchInputRef = useRef(null);
@@ -163,7 +175,7 @@ const PointOfSale = () => {
   const [isSwiping, setIsSwiping] = useState(false);
   
   // Fetch POS configuration
-  const { data: config } = useQuery(
+  const { data: config, refetch: refetchPosConfig } = useQuery(
     'pos-config',
     () => api.get(endpoints.POS.CONFIG).then(res => res.data),
     {
@@ -171,6 +183,30 @@ const PointOfSale = () => {
       refetchOnWindowFocus: false,
     }
   );
+  
+  // Refetch POS config when currency changes
+  useEffect(() => {
+    if (settingsState?.organization?.currency) {
+      // Invalidate the query cache to force a refetch
+      queryClient.invalidateQueries('pos-config');
+      refetchPosConfig();
+    }
+  }, [settingsState?.organization?.currency, refetchPosConfig, queryClient]);
+  
+  // Listen for currency change events
+  useEffect(() => {
+    const handleCurrencyChange = () => {
+      // Invalidate the query cache to force a refetch
+      queryClient.invalidateQueries('pos-config');
+      refetchPosConfig();
+    };
+    
+    window.addEventListener('currencyChanged', handleCurrencyChange);
+    
+    return () => {
+      window.removeEventListener('currencyChanged', handleCurrencyChange);
+    };
+  }, [queryClient, refetchPosConfig]);
   
   // Fetch stock alerts
   const { data: alerts } = useQuery(
@@ -805,11 +841,13 @@ const PointOfSale = () => {
         setShowCalculator(!showCalculator);
       }
       
-      // F4 for discount
+      // F4 for discount (only for admin and pharmacist)
       if (e.key === 'F4') {
         e.preventDefault();
-        if (cart.length > 0) {
+        if (cart.length > 0 && currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'PHARMACIST')) {
           setShowDiscountModal(true);
+        } else if (cart.length > 0) {
+          toast.error('You do not have permission to apply discounts');
         }
       }
       
@@ -820,10 +858,14 @@ const PointOfSale = () => {
         setNotesType('cart');
       }
       
-      // F6 for coupons
+      // F6 for coupons (only for admin and pharmacist)
       if (e.key === 'F6') {
         e.preventDefault();
-        setShowCouponModal(true);
+        if (currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'PHARMACIST')) {
+          setShowCouponModal(true);
+        } else {
+          toast.error('You do not have permission to apply coupons');
+        }
       }
       
       // F7 for offers
@@ -844,10 +886,14 @@ const PointOfSale = () => {
         setDarkMode(!darkMode);
       }
       
-      // F10 for shift management
+      // F10 for shift management (only for admin)
       if (e.key === 'F10') {
         e.preventDefault();
-        setShowShiftModal(!showShiftModal);
+        if (currentUser && currentUser.role === 'ADMIN') {
+          setShowShiftModal(!showShiftModal);
+        } else {
+          toast.error('You do not have permission to access shift management');
+        }
       }
       
       // Ctrl/Cmd + T for new tab
@@ -867,11 +913,13 @@ const PointOfSale = () => {
         }
       }
       
-      // Ctrl/Cmd + D for discount
+      // Ctrl/Cmd + D for discount (only for admin and pharmacist)
       if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
         e.preventDefault();
-        if (cart.length > 0) {
+        if (cart.length > 0 && currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'PHARMACIST')) {
           setShowDiscountModal(true);
+        } else if (cart.length > 0) {
+          toast.error('You do not have permission to apply discounts');
         }
       }
       
@@ -890,10 +938,14 @@ const PointOfSale = () => {
         }
       }
       
-      // Ctrl/Cmd + R for refund
+      // Ctrl/Cmd + R for refund (only for admin and pharmacist)
       if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
         e.preventDefault();
-        setShowRefundModal(true);
+        if (currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'PHARMACIST')) {
+          setShowRefundModal(true);
+        } else {
+          toast.error('You do not have permission to process refunds');
+        }
       }
       
       // Escape to close modals
@@ -986,9 +1038,9 @@ const PointOfSale = () => {
   }, [activeTab]);
   
   // Format currency
-  const formatCurrency = (amount) => {
+  const formatCurrency = useCallback((amount) => {
     return `${posConfig?.currency_symbol || '$'}${amount.toFixed(2)}`;
-  };
+  }, [posConfig]);
   
   // Get expiry status color
   const getExpiryStatusColor = (expiryDate) => {
@@ -1027,6 +1079,49 @@ const PointOfSale = () => {
       setCalculatorValue('0');
       setCalculatorOperation(null);
       setPreviousValue(null);
+    } else if (value === 'CE') {
+      // Clear entry - just clear the current value
+      setCalculatorValue('0');
+    } else if (value === '⌫') {
+      // Backspace
+      if (calculatorValue.length > 1) {
+        setCalculatorValue(calculatorValue.slice(0, -1));
+      } else {
+        setCalculatorValue('0');
+      }
+    } else if (value === '+/-') {
+      // Toggle sign
+      if (calculatorValue !== '0') {
+        setCalculatorValue(calculatorValue.startsWith('-')
+          ? calculatorValue.slice(1)
+          : '-' + calculatorValue);
+      }
+    } else if (value === '%') {
+      // Percentage
+      const currentValue = parseFloat(calculatorValue);
+      if (previousValue !== null && calculatorOperation) {
+        const previous = parseFloat(previousValue);
+        let result;
+        
+        switch (calculatorOperation) {
+          case '+':
+          case '-':
+            result = previous * (currentValue / 100);
+            break;
+          case '*':
+            result = previous * (currentValue / 100);
+            break;
+          case '/':
+            result = previous / (currentValue / 100);
+            break;
+          default:
+            result = currentValue / 100;
+        }
+        
+        setCalculatorValue(result.toString());
+      } else {
+        setCalculatorValue((currentValue / 100).toString());
+      }
     } else if (value === '=') {
       if (previousValue !== null && calculatorOperation) {
         const current = parseFloat(calculatorValue);
@@ -1044,7 +1139,7 @@ const PointOfSale = () => {
             result = previous * current;
             break;
           case '/':
-            result = previous / current;
+            result = current !== 0 ? previous / current : 'Error';
             break;
           default:
             return;
@@ -1059,11 +1154,37 @@ const PointOfSale = () => {
       setCalculatorOperation(value);
       setCalculatorValue('0');
     } else {
-      setCalculatorValue(calculatorValue === '0' ? value : calculatorValue + value);
+      // Handle decimal point
+      if (value === '.') {
+        if (!calculatorValue.includes('.')) {
+          setCalculatorValue(calculatorValue + value);
+        }
+      } else {
+        setCalculatorValue(calculatorValue === '0' ? value : calculatorValue + value);
+      }
+    }
+  };
+
+  const useCalculatorResult = () => {
+    if (calculatorValue !== '0' && calculatorValue !== 'Error') {
+      // Add the calculated value to the current quantity input or payment amount
+      if (showPaymentModal && paymentMode === 'cash') {
+        setAmountPaid(calculatorValue);
+        toast.success('Calculator result applied to payment amount');
+      } else {
+        toast.success('Calculator result: ' + calculatorValue);
+      }
+      setShowCalculator(false);
     }
   };
   
   const applyDiscount = (index) => {
+    // Check if user has permission to apply discounts
+    if (!currentUser || (currentUser.role !== 'ADMIN' && currentUser.role !== 'PHARMACIST')) {
+      toast.error('You do not have permission to apply discounts');
+      return;
+    }
+    
     const newCart = [...cart];
     const item = newCart[index];
     
@@ -1083,6 +1204,12 @@ const PointOfSale = () => {
   };
   
   const applyCoupon = () => {
+    // Check if user has permission to apply coupons
+    if (!currentUser || (currentUser.role !== 'ADMIN' && currentUser.role !== 'PHARMACIST')) {
+      toast.error('You do not have permission to apply coupons');
+      return;
+    }
+    
     // Simulate coupon application (in real app, this would validate with backend)
     if (couponCode === 'SAVE10') {
       setAppliedCoupon({ code: couponCode, discount: 0.1, type: 'percentage' });
@@ -1136,6 +1263,12 @@ const PointOfSale = () => {
   };
   
   const processRefund = async () => {
+    // Check if user has permission to process refunds
+    if (!currentUser || (currentUser.role !== 'ADMIN' && currentUser.role !== 'PHARMACIST')) {
+      toast.error('You do not have permission to process refunds');
+      return;
+    }
+    
     try {
       const refundData = {
         items: refundItems,
@@ -1204,11 +1337,20 @@ const PointOfSale = () => {
   };
   
   const endShift = async () => {
+    // Check if user has permission to end shift
+    if (!currentUser || currentUser.role !== 'ADMIN') {
+      toast.error('You do not have permission to end shift');
+      return;
+    }
+    
     try {
       const shiftData = {
         ...cashReconciliationData,
         staffId: currentUser?.id,
-        endTime: new Date()
+        endTime: new Date(),
+        totalSales: cashReconciliationData.cashSales + cashReconciliationData.cardSales +
+                    cashReconciliationData.upiSales + cashReconciliationData.walletSales +
+                    cashReconciliationData.otherSales
       };
       
       await api.post('/api/pos/end-shift', shiftData);
@@ -1217,13 +1359,70 @@ const PointOfSale = () => {
       setCashReconciliationData({
         expectedCash: 0,
         actualCash: 0,
+        cashSales: 0,
+        cardSales: 0,
+        upiSales: 0,
+        walletSales: 0,
+        otherSales: 0,
+        cashIn: 0,
+        cashOut: 0,
+        openingBalance: 0,
         difference: 0,
         notes: ''
       });
+      setShiftSummary(null);
     } catch (error) {
       toast.error('Failed to end shift');
     }
   };
+
+  const fetchShiftSummary = async () => {
+    try {
+      // In a real app, this would fetch from the API
+      // For now, we'll simulate shift summary data
+      const summary = {
+        totalTransactions: 45,
+        totalSales: 1250.75,
+        paymentBreakdown: {
+          cash: 850.50,
+          card: 300.25,
+          upi: 75.00,
+          wallet: 25.00
+        },
+        topProducts: [
+          { name: 'Paracetamol 500mg', quantity: 12, revenue: 48.00 },
+          { name: 'Amoxicillin 250mg', quantity: 8, revenue: 120.00 },
+          { name: 'Ibuprofen 400mg', quantity: 6, revenue: 36.00 }
+        ],
+        refunds: 2,
+        refundAmount: 45.50,
+        heldBills: 3,
+        discounts: 5,
+        totalDiscount: 25.75
+      };
+      
+      setShiftSummary(summary);
+      
+      // Auto-fill cash reconciliation data
+      setCashReconciliationData(prev => ({
+        ...prev,
+        cashSales: summary.paymentBreakdown.cash,
+        cardSales: summary.paymentBreakdown.card,
+        upiSales: summary.paymentBreakdown.upi,
+        walletSales: summary.paymentBreakdown.wallet,
+        expectedCash: prev.openingBalance + summary.paymentBreakdown.cash + prev.cashIn - prev.cashOut
+      }));
+    } catch (error) {
+      toast.error('Failed to fetch shift summary');
+    }
+  };
+
+  // Fetch shift summary when modal opens
+  useEffect(() => {
+    if (showCashReconciliationModal && !shiftSummary) {
+      fetchShiftSummary();
+    }
+  }, [showCashReconciliationModal, shiftSummary]);
   
   // Touch event handlers for swipe actions
   const handleTouchStart = (e) => {
@@ -1344,22 +1543,61 @@ const PointOfSale = () => {
             </button>
             
             {/* Staff Login */}
-            <button
-              onClick={() => setShowStaffLoginModal(true)}
-              className={`p-2 rounded-md ${darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
-              title="Staff Login"
-            >
-              <UserIcon className="h-4 w-4" />
-            </button>
+            {currentUser ? (
+              <div className={`flex items-center space-x-2 px-3 py-1 rounded-md ${
+                darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+              }`}>
+                <UserIcon className="h-4 w-4" />
+                <span className="text-sm font-medium">{currentUser.full_name}</span>
+                <span className={`text-xs px-2 py-1 rounded ${
+                  currentUser.role === 'ADMIN' ? 'bg-red-500 text-white' :
+                  currentUser.role === 'PHARMACIST' ? 'bg-blue-500 text-white' :
+                  'bg-green-500 text-white'
+                }`}>
+                  {currentUser.role}
+                </span>
+                <button
+                  onClick={() => {
+                    setCurrentUser(null);
+                    toast.success('Logged out successfully');
+                  }}
+                  className={`p-1 rounded ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-300'}`}
+                  title="Logout"
+                >
+                  <XMarkIcon className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowStaffLoginModal(true)}
+                className={`p-2 rounded-md ${darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+                title="Staff Login"
+              >
+                <UserIcon className="h-4 w-4" />
+              </button>
+            )}
             
-            {/* Shift Management */}
-            <button
-              onClick={() => setShowShiftModal(true)}
-              className={`p-2 rounded-md ${darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
-              title="Shift Management (F10)"
-            >
-              <ClockIcon className="h-4 w-4" />
-            </button>
+            {/* Shift Management (Admin only) */}
+            {currentUser && currentUser.role === 'ADMIN' && (
+              <button
+                onClick={() => setShowShiftModal(true)}
+                className={`p-2 rounded-md ${darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+                title="Shift Management (F10)"
+              >
+                <ClockIcon className="h-4 w-4" />
+              </button>
+            )}
+            
+            {/* Cash Reconciliation (Admin only) */}
+            {currentUser && currentUser.role === 'ADMIN' && (
+              <button
+                onClick={() => setShowCashReconciliationModal(true)}
+                className={`p-2 rounded-md ${darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+                title="Cash Reconciliation"
+              >
+                <CurrencyDollarIcon className="h-4 w-4" />
+              </button>
+            )}
             
             {/* Offers */}
             <button
@@ -1669,6 +1907,21 @@ const PointOfSale = () => {
                           >
                             View Details
                           </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedMedicine(medicine);
+                              setShowBarcodePrintModal(true);
+                            }}
+                            className={`px-4 py-3 text-sm rounded-lg border touch-manipulation font-medium ${
+                              darkMode
+                                ? 'border-gray-600 text-gray-300 hover:bg-gray-600'
+                                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            <PrinterIcon className="h-4 w-4 inline mr-1" />
+                            Print Barcode
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1813,16 +2066,18 @@ const PointOfSale = () => {
                         >
                           <DocumentTextIcon className="h-5 w-5" />
                         </button>
-                        <button
-                          onClick={() => {
-                            setDiscountIndex(index);
-                            setShowDiscountModal(true);
-                          }}
-                          className={`p-2 rounded ${darkMode ? 'hover:bg-gray-600 text-gray-400' : 'hover:bg-gray-200 text-gray-500'} touch-manipulation`}
-                          title="Apply Discount (F4)"
-                        >
-                          <ReceiptPercentIcon className="h-5 w-5" />
-                        </button>
+                        {currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'PHARMACIST') && (
+                          <button
+                            onClick={() => {
+                              setDiscountIndex(index);
+                              setShowDiscountModal(true);
+                            }}
+                            className={`p-2 rounded ${darkMode ? 'hover:bg-gray-600 text-gray-400' : 'hover:bg-gray-200 text-gray-500'} touch-manipulation`}
+                            title="Apply Discount (F4)"
+                          >
+                            <ReceiptPercentIcon className="h-5 w-5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => removeFromCart(index)}
                           className="p-2 text-red-500 hover:text-red-700 touch-manipulation"
@@ -1882,17 +2137,19 @@ const PointOfSale = () => {
               {/* Coupon and Notes */}
               <div className="space-y-2 mb-4">
                 <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setShowCouponModal(true)}
-                    className={`flex-1 px-3 py-2 text-sm rounded-md ${
-                      darkMode
-                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    <TicketIcon className="h-4 w-4 inline mr-1" />
-                    Apply Coupon (F6)
-                  </button>
+                  {currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'PHARMACIST') && (
+                    <button
+                      onClick={() => setShowCouponModal(true)}
+                      className={`flex-1 px-3 py-2 text-sm rounded-md ${
+                        darkMode
+                          ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <TicketIcon className="h-4 w-4 inline mr-1" />
+                      Apply Coupon (F6)
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setNotesType('cart');
@@ -2030,17 +2287,19 @@ const PointOfSale = () => {
                     <PauseIcon className="h-4 w-4 inline mr-1" />
                     Hold
                   </button>
-                  <button
-                    onClick={() => setShowRefundModal(true)}
-                    className={`px-3 py-3 text-sm rounded-lg touch-manipulation font-medium ${
-                      darkMode
-                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    <ArrowUturnLeftIcon className="h-4 w-4 inline mr-1" />
-                    Refund
-                  </button>
+                  {currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'PHARMACIST') && (
+                    <button
+                      onClick={() => setShowRefundModal(true)}
+                      className={`px-3 py-3 text-sm rounded-lg touch-manipulation font-medium ${
+                        darkMode
+                          ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      <ArrowUturnLeftIcon className="h-4 w-4 inline mr-1" />
+                      Refund
+                    </button>
+                  )}
                   <button
                     onClick={() => setCart([])}
                     className={`px-3 py-3 text-sm rounded-lg touch-manipulation font-medium ${
@@ -3393,29 +3652,217 @@ const PointOfSale = () => {
       {/* Barcode Print Modal */}
       {showBarcodePrintModal && selectedMedicine && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-lg p-6 w-96`}>
-            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Print Barcode Labels</h3>
-            <div className="space-y-4">
-              <div className={`p-3 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{selectedMedicine.name}</p>
-                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>SKU: {selectedMedicine.sku}</p>
+          <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Print Barcode Labels</h3>
+              <button
+                onClick={() => {
+                  setShowBarcodePrintModal(false);
+                  setBarcodePrintQuantity(1);
+                }}
+                className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Product Information */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Product Details</h4>
+                  <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                    <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{selectedMedicine.name}</p>
+                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{selectedMedicine.generic_name}</p>
+                    <div className="mt-2 space-y-1">
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>SKU: {selectedMedicine.sku}</p>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Strength: {selectedMedicine.strength}</p>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Form: {selectedMedicine.dosage_form}</p>
+                      {selectedMedicine.manufacturer && (
+                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Manufacturer: {selectedMedicine.manufacturer}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Batch Selection */}
+                <div>
+                  <h4 className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Select Batch</h4>
+                  {selectedMedicine.batches && selectedMedicine.batches.length > 0 ? (
+                    <div className="space-y-2">
+                      {selectedMedicine.batches.map((batch) => (
+                        <div
+                          key={batch.id}
+                          className={`p-2 rounded border cursor-pointer transition-colors ${
+                            darkMode
+                              ? 'border-gray-600 hover:bg-gray-600'
+                              : 'border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                {batch.batch_number}
+                              </p>
+                              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                Exp: {new Date(batch.expiry_date).toLocaleDateString()}
+                              </p>
+                              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                Stock: {batch.current_stock}
+                              </p>
+                            </div>
+                            <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {formatCurrency(batch.selling_price)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>No batches available</p>
+                  )}
+                </div>
+                
+                {/* Quick Print Options */}
+                <div>
+                  <h4 className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Quick Print</h4>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[1, 5, 10, 20].map((qty) => (
+                      <button
+                        key={qty}
+                        onClick={() => setBarcodePrintQuantity(qty)}
+                        className={`px-3 py-2 text-sm rounded-md transition-colors ${
+                          barcodePrintQuantity === qty
+                            ? 'bg-blue-500 text-white'
+                            : darkMode
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {qty}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Number of Labels
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={barcodePrintQuantity}
-                  onChange={(e) => setBarcodePrintQuantity(parseInt(e.target.value) || 1)}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
-                  }`}
-                />
+              
+              {/* Label Options */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Label Options</h4>
+                  
+                  {/* Label Size */}
+                  <div className="mb-4">
+                    <label className={`block text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-1`}>
+                      Label Size
+                    </label>
+                    <select
+                      className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                      }`}
+                    >
+                      <option value="small">Small (40x20mm)</option>
+                      <option value="medium">Medium (50x25mm)</option>
+                      <option value="large">Large (60x30mm)</option>
+                    </select>
+                  </div>
+                  
+                  {/* Label Content */}
+                  <div className="mb-4">
+                    <label className={`block text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-1`}>
+                      Label Content
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          defaultChecked
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span className={`ml-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Product Name</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          defaultChecked
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span className={`ml-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Price</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          defaultChecked
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span className={`ml-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Batch Number</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span className={`ml-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Expiry Date</span>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  {/* Print Quantity */}
+                  <div>
+                    <label className={`block text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-1`}>
+                      Number of Labels
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={barcodePrintQuantity}
+                      onChange={(e) => setBarcodePrintQuantity(parseInt(e.target.value) || 1)}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                      }`}
+                    />
+                  </div>
+                </div>
+                
+                {/* Label Preview */}
+                <div>
+                  <h4 className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Label Preview</h4>
+                  <div className={`p-4 rounded-lg border-2 border-dashed ${
+                    darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-300 bg-gray-50'
+                  }`}>
+                    <div className="text-center">
+                      <div className={`w-32 h-16 mx-auto mb-2 ${darkMode ? 'bg-gray-600' : 'bg-white'} border rounded flex items-center justify-center`}>
+                        <div className="text-center">
+                          <div className={`text-xs font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {selectedMedicine.name.length > 20 ? selectedMedicine.name.substring(0, 20) + '...' : selectedMedicine.name}
+                          </div>
+                          <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {formatCurrency(selectedMedicine.selling_price)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className={`w-32 h-8 mx-auto ${darkMode ? 'bg-gray-600' : 'bg-white'} border rounded flex items-center justify-center`}>
+                        <div className={`w-24 h-4 ${darkMode ? 'bg-gray-500' : 'bg-gray-800'}`}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Printer Status */}
+                <div>
+                  <h4 className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Printer Status</h4>
+                  <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-green-50'}`}>
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                      <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Ready</span>
+                    </div>
+                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-1`}>Zebra ZD410 - Connected</p>
+                  </div>
+                </div>
               </div>
             </div>
+            
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => {
@@ -3434,6 +3881,7 @@ const PointOfSale = () => {
                 onClick={printBarcodeLabels}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
+                <PrinterIcon className="h-4 w-4 inline mr-1" />
                 Print Labels
               </button>
             </div>
@@ -3507,84 +3955,380 @@ const PointOfSale = () => {
       {/* Cash Reconciliation Modal */}
       {showCashReconciliationModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-lg p-6 w-96`}>
-            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>End Shift - Cash Reconciliation</h3>
-            <div className="space-y-4">
-              <div>
-                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Expected Cash
-                </label>
-                <input
-                  type="number"
-                  value={cashReconciliationData.expectedCash}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value) || 0;
-                    setCashReconciliationData({
-                      ...cashReconciliationData,
-                      expectedCash: value,
-                      difference: value - cashReconciliationData.actualCash
-                    });
-                  }}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
-                  }`}
-                  placeholder="0.00"
-                  step="0.01"
-                />
-              </div>
-              <div>
-                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Actual Cash
-                </label>
-                <input
-                  type="number"
-                  value={cashReconciliationData.actualCash}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value) || 0;
-                    setCashReconciliationData({
-                      ...cashReconciliationData,
-                      actualCash: value,
-                      difference: cashReconciliationData.expectedCash - value
-                    });
-                  }}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
-                  }`}
-                  placeholder="0.00"
-                  step="0.01"
-                />
-              </div>
-              <div className={`p-3 rounded ${Math.abs(cashReconciliationData.difference) > 0.01 ? (cashReconciliationData.difference > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700') : (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700')}`}>
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium">Difference:</span>
-                  <span className="text-lg font-bold">
-                    {formatCurrency(Math.abs(cashReconciliationData.difference))}
-                    {cashReconciliationData.difference > 0 ? ' (Short)' : cashReconciliationData.difference < 0 ? ' (Over)' : ' (Balanced)'}
-                  </span>
+          <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto`}>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>End Shift - Cash Reconciliation</h3>
+              <button
+                onClick={() => {
+                  setShowCashReconciliationModal(false);
+                  setShiftSummary(null);
+                }}
+                className={`p-2 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            
+            {/* Shift Summary */}
+            {shiftSummary && (
+              <div className={`mb-6 p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}>
+                <h4 className={`text-lg font-medium mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Shift Summary</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Transactions</p>
+                    <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{shiftSummary.totalTransactions}</p>
+                  </div>
+                  <div>
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Sales</p>
+                    <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(shiftSummary.totalSales)}</p>
+                  </div>
+                  <div>
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Refunds</p>
+                    <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{shiftSummary.refunds}</p>
+                  </div>
+                  <div>
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Discounts</p>
+                    <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(shiftSummary.totalDiscount)}</p>
+                  </div>
+                </div>
+                
+                {/* Payment Breakdown */}
+                <div className="mt-4">
+                  <p className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Payment Breakdown</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <div className={`p-2 rounded ${darkMode ? 'bg-gray-600' : 'bg-white'}`}>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Cash</p>
+                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(shiftSummary.paymentBreakdown.cash)}</p>
+                    </div>
+                    <div className={`p-2 rounded ${darkMode ? 'bg-gray-600' : 'bg-white'}`}>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Card</p>
+                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(shiftSummary.paymentBreakdown.card)}</p>
+                    </div>
+                    <div className={`p-2 rounded ${darkMode ? 'bg-gray-600' : 'bg-white'}`}>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>UPI</p>
+                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(shiftSummary.paymentBreakdown.upi)}</p>
+                    </div>
+                    <div className={`p-2 rounded ${darkMode ? 'bg-gray-600' : 'bg-white'}`}>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Wallet</p>
+                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(shiftSummary.paymentBreakdown.wallet)}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Top Products */}
+                <div className="mt-4">
+                  <p className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Top Products</p>
+                  <div className="space-y-1">
+                    {shiftSummary.topProducts.map((product, index) => (
+                      <div key={index} className={`flex justify-between text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <span>{product.name} ({product.quantity})</span>
+                        <span>{formatCurrency(product.revenue)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Notes
-                </label>
-                <textarea
-                  value={cashReconciliationData.notes}
-                  onChange={(e) => setCashReconciliationData({...cashReconciliationData, notes: e.target.value})}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
-                  }`}
-                  placeholder="Add any notes about the shift..."
-                  rows={3}
-                />
+            )}
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Cash Reconciliation Form */}
+              <div className="space-y-4">
+                <h4 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Cash Details</h4>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                      Opening Balance
+                    </label>
+                    <input
+                      type="number"
+                      value={cashReconciliationData.openingBalance}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value) || 0;
+                        setCashReconciliationData({
+                          ...cashReconciliationData,
+                          openingBalance: value,
+                          expectedCash: value + cashReconciliationData.cashSales + cashReconciliationData.cashIn - cashReconciliationData.cashOut
+                        });
+                      }}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                      }`}
+                      placeholder="0.00"
+                      step="0.01"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                      Cash Sales
+                    </label>
+                    <input
+                      type="number"
+                      value={cashReconciliationData.cashSales}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value) || 0;
+                        setCashReconciliationData({
+                          ...cashReconciliationData,
+                          cashSales: value,
+                          expectedCash: cashReconciliationData.openingBalance + value + cashReconciliationData.cashIn - cashReconciliationData.cashOut
+                        });
+                      }}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                      }`}
+                      placeholder="0.00"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                      Cash In
+                    </label>
+                    <input
+                      type="number"
+                      value={cashReconciliationData.cashIn}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value) || 0;
+                        setCashReconciliationData({
+                          ...cashReconciliationData,
+                          cashIn: value,
+                          expectedCash: cashReconciliationData.openingBalance + cashReconciliationData.cashSales + value - cashReconciliationData.cashOut
+                        });
+                      }}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                      }`}
+                      placeholder="0.00"
+                      step="0.01"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                      Cash Out
+                    </label>
+                    <input
+                      type="number"
+                      value={cashReconciliationData.cashOut}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value) || 0;
+                        setCashReconciliationData({
+                          ...cashReconciliationData,
+                          cashOut: value,
+                          expectedCash: cashReconciliationData.openingBalance + cashReconciliationData.cashSales + cashReconciliationData.cashIn - value
+                        });
+                      }}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                      }`}
+                      placeholder="0.00"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                    Expected Cash
+                  </label>
+                  <div className={`p-3 rounded-md ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                    <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {formatCurrency(cashReconciliationData.expectedCash)}
+                    </p>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                    Actual Cash
+                  </label>
+                  <input
+                    type="number"
+                    value={cashReconciliationData.actualCash}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || 0;
+                      setCashReconciliationData({
+                        ...cashReconciliationData,
+                        actualCash: value,
+                        difference: cashReconciliationData.expectedCash - value
+                      });
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                    }`}
+                    placeholder="0.00"
+                    step="0.01"
+                  />
+                </div>
+                
+                <div className={`p-3 rounded-lg ${
+                  Math.abs(cashReconciliationData.difference) > 0.01
+                    ? (cashReconciliationData.difference > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700')
+                    : (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700')
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Difference:</span>
+                    <span className="text-xl font-bold">
+                      {formatCurrency(Math.abs(cashReconciliationData.difference))}
+                      {cashReconciliationData.difference > 0 ? ' (Short)' : cashReconciliationData.difference < 0 ? ' (Over)' : ' (Balanced)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Other Payment Methods */}
+              <div className="space-y-4">
+                <h4 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Other Payment Methods</h4>
+                
+                <div>
+                  <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                    Card Sales
+                  </label>
+                  <input
+                    type="number"
+                    value={cashReconciliationData.cardSales}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || 0;
+                      setCashReconciliationData({...cashReconciliationData, cardSales: value});
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                    }`}
+                    placeholder="0.00"
+                    step="0.01"
+                  />
+                </div>
+                
+                <div>
+                  <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                    UPI Sales
+                  </label>
+                  <input
+                    type="number"
+                    value={cashReconciliationData.upiSales}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || 0;
+                      setCashReconciliationData({...cashReconciliationData, upiSales: value});
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                    }`}
+                    placeholder="0.00"
+                    step="0.01"
+                  />
+                </div>
+                
+                <div>
+                  <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                    Wallet Sales
+                  </label>
+                  <input
+                    type="number"
+                    value={cashReconciliationData.walletSales}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || 0;
+                      setCashReconciliationData({...cashReconciliationData, walletSales: value});
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                    }`}
+                    placeholder="0.00"
+                    step="0.01"
+                  />
+                </div>
+                
+                <div>
+                  <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                    Other Sales
+                  </label>
+                  <input
+                    type="number"
+                    value={cashReconciliationData.otherSales}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || 0;
+                      setCashReconciliationData({...cashReconciliationData, otherSales: value});
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                    }`}
+                    placeholder="0.00"
+                    step="0.01"
+                  />
+                </div>
+                
+                {/* Total Sales Summary */}
+                <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}>
+                  <h5 className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Total Sales Summary</h5>
+                  <div className="space-y-1">
+                    <div className={`flex justify-between text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <span>Cash Sales:</span>
+                      <span>{formatCurrency(cashReconciliationData.cashSales)}</span>
+                    </div>
+                    <div className={`flex justify-between text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <span>Card Sales:</span>
+                      <span>{formatCurrency(cashReconciliationData.cardSales)}</span>
+                    </div>
+                    <div className={`flex justify-between text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <span>UPI Sales:</span>
+                      <span>{formatCurrency(cashReconciliationData.upiSales)}</span>
+                    </div>
+                    <div className={`flex justify-between text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <span>Wallet Sales:</span>
+                      <span>{formatCurrency(cashReconciliationData.walletSales)}</span>
+                    </div>
+                    <div className={`flex justify-between text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <span>Other Sales:</span>
+                      <span>{formatCurrency(cashReconciliationData.otherSales)}</span>
+                    </div>
+                    <div className={`flex justify-between text-sm font-bold pt-2 border-t ${darkMode ? 'border-gray-600 text-white' : 'border-gray-300 text-gray-900'}`}>
+                      <span>Total:</span>
+                      <span>{formatCurrency(
+                        cashReconciliationData.cashSales + cashReconciliationData.cardSales +
+                        cashReconciliationData.upiSales + cashReconciliationData.walletSales +
+                        cashReconciliationData.otherSales
+                      )}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+            
+            {/* Notes Section */}
+            <div className="mt-6">
+              <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                Shift Notes
+              </label>
+              <textarea
+                value={cashReconciliationData.notes}
+                onChange={(e) => setCashReconciliationData({...cashReconciliationData, notes: e.target.value})}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                }`}
+                placeholder="Add any notes about the shift, discrepancies, or issues..."
+                rows={3}
+              />
+            </div>
+            
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => {
                   setShowCashReconciliationModal(false);
+                  setShiftSummary(null);
                   setCashReconciliationData({
                     expectedCash: 0,
                     actualCash: 0,
+                    cashSales: 0,
+                    cardSales: 0,
+                    upiSales: 0,
+                    walletSales: 0,
+                    otherSales: 0,
+                    cashIn: 0,
+                    cashOut: 0,
+                    openingBalance: 0,
                     difference: 0,
                     notes: ''
                   });
@@ -3599,7 +4343,8 @@ const PointOfSale = () => {
               </button>
               <button
                 onClick={endShift}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                disabled={!cashReconciliationData.actualCash || cashReconciliationData.actualCash < 0}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
                 End Shift
               </button>

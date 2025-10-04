@@ -440,3 +440,88 @@ Logo, favicon, branding customization
 ## Support
 
 For support and questions, please open an issue in the repository.
+
+
+## Issue
+
+
+Below feature and functionality
+Settings
+Manage your pharmacy system configuration and preferences
+
+
+Organization Settings
+Store details, tax info, and formats
+
+User & Roles
+Manage users and their permissions
+
+POS Settings
+Payment methods and receipt layout
+
+Inventory Settings
+Reorder levels and expiry alerts
+
+Notifications
+Email/SMS templates and gateways
+
+Integrations
+Third-party service connections
+
+Compliance
+Regulatory settings and licenses
+
+Backup & Data
+Data backup and import/export
+
+Theme & UI
+Appearance and branding
+
+
+
+------
+
+@problems @/backend/app/routers/settings.py  @/frontend/src/contexts/SettingsContext.js @/frontend/src/pages/settings/OrganizationSettings.js @/frontend/src/pages/settings/ThemeSettings.js @/frontend/src/pages/settings/POSSettings.js @/frontend/src/pages/settings @/frontend/src/pages/settings/Settings.js  Most of features and functionality are not working, MAKE ALL FEATURES AND FUNCTIONALITY
+
+Below feature and functionality
+Settings
+Manage your pharmacy system configuration and preferences
+
+
+Organization Settings
+Store details, tax info, and formats
+-------------------------------
+
+@problems @/backend/app/routers/settings.py  @/frontend/src/contexts/SettingsContext.js @/frontend/src/pages/settings/OrganizationSettings.js @/frontend/src/pages/settings/ThemeSettings.js @/frontend/src/pages/settings/POSSettings.js @/frontend/src/pages/settings @/frontend/src/pages/settings/Settings.js  Most of features and functionality are not working, MAKE ALL FEATURES AND FUNCTIONALITY
+
+User & Roles
+Manage users and their permissions
+
+POS Settings
+Payment methods and receipt layout
+
+----------------------------111
+@problems @/backend/app/routers/settings.py  @/frontend/src/contexts/SettingsContext.js @/frontend/src/pages/settings/OrganizationSettings.js @/frontend/src/pages/settings/ThemeSettings.js @/frontend/src/pages/settings/POSSettings.js @/frontend/src/pages/settings @/frontend/src/pages/settings/Settings.js  Most of features and functionality are not working, MAKE ALL FEATURES AND FUNCTIONALITY
+
+Inventory Settings
+Reorder levels and expiry alerts
+
+Notifications
+Email/SMS templates and gateways   ->>>>>>>>>
+
+-------------------22
+@problems @/backend/app/routers/settings.py  @/frontend/src/contexts/SettingsContext.js @/frontend/src/pages/settings/OrganizationSettings.js @/frontend/src/pages/settings/ThemeSettings.js @/frontend/src/pages/settings/POSSettings.js @/frontend/src/pages/settings @/frontend/src/pages/settings/Settings.js  Most of features and functionality are not working, MAKE ALL FEATURES AND FUNCTIONALITY
+
+Integrations
+Third-party service connections
+
+Compliance
+Regulatory settings and licenses
+------------------
+@problems @/backend/app/routers/settings.py  @/frontend/src/contexts/SettingsContext.js @/frontend/src/pages/settings/OrganizationSettings.js @/frontend/src/pages/settings/ThemeSettings.js @/frontend/src/pages/settings/POSSettings.js @/frontend/src/pages/settings @/frontend/src/pages/settings/Settings.js  Most of features and functionality are not working, MAKE ALL FEATURES AND FUNCTIONALITY
+
+Backup & Data
+Data backup and import/export
+
+Theme & UI
+Appearance and branding

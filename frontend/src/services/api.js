@@ -55,6 +55,9 @@ export const endpoints = {
     ME: '/api/auth/me',
     CHANGE_PASSWORD: '/api/auth/change-password',
     USERS: '/api/auth/users',
+    USER: (id) => `/api/auth/users/${id}`,
+    DELETE_USER: (id) => `/api/auth/users/${id}`,
+    TOGGLE_USER_STATUS: (id) => `/api/auth/users/${id}/toggle-status`,
     STAFF_LOGIN: '/api/auth/staff-login',
   },
   
@@ -106,6 +109,9 @@ export const endpoints = {
     REFUND: (id) => `/api/billing/invoices/${id}/refund`,
     SALES_REPORT: '/api/billing/sales-report',
     CALCULATE_TAX: '/api/billing/calculate-tax',
+    POS_TRANSACTIONS: '/api/billing/pos-transactions',
+    HELD_BILLS: '/api/billing/held-bills',
+    ALL_TRANSACTIONS: '/api/billing/all-transactions',
   },
   
   // POS endpoints
@@ -142,12 +148,41 @@ export const endpoints = {
     AUDIT_LOGS: '/api/reports/audit-logs',
     GENERATE: '/api/reports/generate',
   },
+  
+  // Settings endpoints
+  SETTINGS: {
+    ORGANIZATION: '/api/settings/organization',
+    POS: '/api/settings/pos',
+    INVENTORY: '/api/settings/inventory',
+    NOTIFICATIONS: '/api/settings/notifications',
+    INTEGRATIONS: '/api/settings/integrations',
+    COMPLIANCE: '/api/settings/compliance',
+    BACKUP: '/api/settings/backup',
+    THEME: '/api/settings/theme',
+    USERS: '/api/settings/users',
+    USERS_LIST: '/api/settings/users/list',
+    USERS_CREATE: '/api/settings/users/create',
+    USER_UPDATE: (id) => `/api/settings/users/${id}`,
+    USER_DELETE: (id) => `/api/settings/users/${id}`,
+    USER_RESET_PASSWORD: (id) => `/api/settings/users/${id}/reset-password`,
+    USER_TOGGLE_STATUS: (id) => `/api/settings/users/${id}/toggle-status`,
+    BACKUP_CREATE: '/api/settings/backup/create',
+    BACKUP_HISTORY: '/api/settings/backup/history',
+    BACKUP_RESTORE: (id) => `/api/settings/backup/${id}/restore`,
+    EXPORT_DATA: '/api/settings/export',
+    UPLOAD_DOCUMENT: '/api/settings/upload-document',
+    TEST_CONNECTION: (integration) => `/api/settings/test-connection/${integration}`,
+    TEST_EMAIL: '/api/settings/test-email',
+    TEST_SMS: '/api/settings/test-sms',
+  },
 };
 
-// Response interceptor for handling common errors
+// Response interceptor for handling common errors and token refresh
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+    
     // Handle common error scenarios
     if (error.response) {
       // Server responded with error status
@@ -156,7 +191,31 @@ api.interceptors.response.use(
       switch (status) {
         case 401:
           // Unauthorized - token expired or invalid
-          // This will be handled by the AuthContext interceptor
+          // Try to refresh the token if we haven't already
+          if (!originalRequest._retry) {
+            originalRequest._retry = true;
+            
+            try {
+              const refreshToken = localStorage.getItem('refreshToken');
+              if (refreshToken) {
+                const response = await authAPI.post('/api/auth/refresh', {
+                  refresh_token: refreshToken
+                });
+                
+                const { access_token } = response.data;
+                localStorage.setItem('token', access_token);
+                
+                // Retry the original request with new token
+                originalRequest.headers.Authorization = `Bearer ${access_token}`;
+                return api(originalRequest);
+              }
+            } catch (refreshError) {
+              // Refresh failed, clear tokens and redirect to login
+              localStorage.removeItem('token');
+              localStorage.removeItem('refreshToken');
+              window.location.href = '/login';
+            }
+          }
           break;
         case 403:
           // Forbidden - user doesn't have permission

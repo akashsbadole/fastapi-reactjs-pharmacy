@@ -6,6 +6,7 @@ import uvicorn
 
 from app.database import get_db
 from app.routers import auth, inventory, prescriptions, patients, billing, reports, pos
+from app.routers.settings import router as settings_router
 from app.config import settings
 
 app = FastAPI(
@@ -17,7 +18,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # React frontend
+    allow_origins=["*"],  # Allow all origins during development     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # React frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,6 +33,7 @@ app.include_router(patients.router, prefix="/api/patients", tags=["patients"])
 app.include_router(billing.router, prefix="/api/billing", tags=["billing"])
 app.include_router(pos.router, prefix="/api/pos", tags=["pos"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
+app.include_router(settings_router, prefix="/api", tags=["settings"])
 
 @app.get("/")
 async def root():

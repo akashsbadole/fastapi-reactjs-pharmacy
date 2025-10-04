@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSettings } from '../contexts/SettingsContext';
 import {
   HomeIcon,
   UsersIcon,
@@ -14,13 +15,31 @@ import {
   XMarkIcon,
   BellIcon,
   ShoppingCartIcon,
+  UserCircleIcon,
 } from '@heroicons/react/24/outline';
 
 const Layout = () => {
   const { user, logout } = useAuth();
+  const { organization, theme } = useSettings() || {};
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const profileDropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+        setProfileDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -41,6 +60,9 @@ const Layout = () => {
   if (user?.role === 'admin') {
     navigation.push({ name: 'Users', href: '/users', icon: CogIcon });
   }
+  
+  // Add Settings for all authenticated users
+  navigation.push({ name: 'Settings', href: '/settings', icon: CogIcon });
 
   const isActive = (href) => {
     if (href === '/inventory') {
@@ -62,7 +84,18 @@ const Layout = () => {
           className={`relative flex w-64 flex-1 flex-col bg-white transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
         >
           <div className="flex items-center justify-between px-4 py-6 border-b border-gray-200">
-            <h1 className="text-xl font-semibold text-gray-900">Pharmacy System</h1>
+            <div className="flex items-center space-x-3">
+              {theme?.branding?.logo && (
+                <img
+                  src={theme.branding.logo}
+                  alt="Store logo"
+                  className="h-8 w-8 object-contain"
+                />
+              )}
+              <h1 className="text-xl font-semibold text-gray-900">
+                {organization?.storeName || 'Pharmacy System'}
+              </h1>
+            </div>
             <button
               type="button"
               className="text-gray-400 hover:text-gray-500"
@@ -100,7 +133,18 @@ const Layout = () => {
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow bg-white border-r border-gray-200 pt-5 pb-4 overflow-y-auto">
           <div className="flex items-center flex-shrink-0 px-4">
-            <h1 className="text-xl font-semibold text-gray-900">Pharmacy System</h1>
+            <div className="flex items-center space-x-3">
+              {theme?.branding?.logo && (
+                <img
+                  src={theme.branding.logo}
+                  alt="Store logo"
+                  className="h-8 w-8 object-contain"
+                />
+              )}
+              <h1 className="text-xl font-semibold text-gray-900">
+                {organization?.storeName || 'Pharmacy System'}
+              </h1>
+            </div>
           </div>
           <nav className="mt-5 flex-1 px-2 space-y-1">
             {navigation.map((item) => (
@@ -149,8 +193,11 @@ const Layout = () => {
               </button>
 
               {/* Profile dropdown */}
-              <div className="relative">
-                <div className="flex items-center space-x-3">
+              <div className="relative" ref={profileDropdownRef}>
+                <button
+                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                  className="flex items-center space-x-3 text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
                   <div className="text-right">
                     <p className="text-sm font-medium text-gray-900">{user?.full_name}</p>
                     <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
@@ -160,14 +207,33 @@ const Layout = () => {
                       {user?.full_name?.charAt(0).toUpperCase()}
                     </span>
                   </div>
-                  <button
-                    onClick={handleLogout}
-                    className="p-1 rounded-full text-gray-400 hover:text-gray-500"
-                    title="Logout"
-                  >
-                    <ArrowRightOnRectangleIcon className="h-6 w-6" />
-                  </button>
-                </div>
+                </button>
+
+                {/* Dropdown menu */}
+                {profileDropdownOpen && (
+                  <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 focus:outline-none z-20">
+                    <div className="py-1">
+                      <Link
+                        to="/profile"
+                        className="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        onClick={() => setProfileDropdownOpen(false)}
+                      >
+                        <UserCircleIcon className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
+                        Your Profile
+                      </Link>
+                      <button
+                        onClick={() => {
+                          handleLogout();
+                          setProfileDropdownOpen(false);
+                        }}
+                        className="group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <ArrowRightOnRectangleIcon className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
+                        Sign out
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

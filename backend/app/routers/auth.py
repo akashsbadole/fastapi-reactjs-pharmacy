@@ -291,6 +291,79 @@ async def update_user(
     
     return db_user
 
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    db_user = db.query(User).filter(User.id == user_id).first()
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Don't allow users to delete themselves
+    if db_user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    
+    # Store user info for audit
+    user_info = {
+        "username": db_user.username,
+        "email": db_user.email,
+        "full_name": db_user.full_name
+    }
+    
+    # Delete user
+    db.delete(db_user)
+    db.commit()
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        action="DELETE",
+        resource_type="USER",
+        resource_id=user_id,
+        old_values=str(user_info),
+        new_values="User deleted"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    return {"message": "User deleted successfully"}
+
+@router.patch("/users/{user_id}/toggle-status")
+async def toggle_user_status(
+    user_id: int,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    db_user = db.query(User).filter(User.id == user_id).first()
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Don't allow users to deactivate themselves
+    if db_user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot change your own status")
+    
+    # Toggle user status
+    old_status = db_user.is_active
+    db_user.is_active = not db_user.is_active
+    db.commit()
+    db.refresh(db_user)
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        action="STATUS_TOGGLE",
+        resource_type="USER",
+        resource_id=user_id,
+        old_values=f"User was {'active' if old_status else 'inactive'}",
+        new_values=f"User is now {'active' if db_user.is_active else 'inactive'}"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    return {"message": f"User is now {'active' if db_user.is_active else 'inactive'}"}
+
 @router.post("/staff-login", response_model=StaffLoginResponse)
 async def staff_login(login_data: StaffLoginRequest, db: Session = Depends(get_db)):
     try:

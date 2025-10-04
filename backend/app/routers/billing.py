@@ -4,10 +4,11 @@ from sqlalchemy import func, and_, or_
 from typing import List, Optional
 from datetime import datetime, date, timedelta
 import uuid
+import json
 
 from ..models import (
     User, Patient, Invoice, InvoiceItem, Payment, Medicine, MedicineBatch,
-    Prescription, AuditLog, StockMovement, Refund
+    Prescription, AuditLog, StockMovement, Refund, HoldBill
 )
 
 from ..database import get_db
@@ -159,14 +160,14 @@ async def create_invoice(
     
     return InvoiceWithItems(**db_invoice.__dict__, items=items)
 
-@router.get("/", response_model=List[InvoiceSummary])
+@router.get("/invoices", response_model=List[InvoiceSummary])
 async def list_invoices(
-    skip: int = 0,
-    limit: int = 50,
-    payment_status: Optional[str] = None,
-    patient_id: Optional[int] = None,
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    payment_status: Optional[str] = Query(None),
+    patient_id: Optional[int] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -236,12 +237,12 @@ async def get_invoice(
     
     item_details = []
     for item, medicine, batch, prescription in items:
-        item_details.append(InvoiceItemWithDetails(
+        item_details.append({
             **item.__dict__,
-            medicine_name=medicine.name,
-            batch_number=batch.batch_number,
-            prescription_number=prescription.prescription_number if prescription else None
-        ))
+            "medicine_name": medicine.name,
+            "batch_number": batch.batch_number,
+            "prescription_number": prescription.prescription_number if prescription else None
+        })
     
     return InvoiceWithDetails(
         **invoice_obj.__dict__,
@@ -384,6 +385,7 @@ async def refund_invoice(
     
     # Create refund record (simplified - in real system would have separate refund table)
     db_refund = Refund(
+        refund_number=f"REF{datetime.now().strftime('%Y%m%d%H%M%S')}",
         invoice_id=invoice_id,
         amount=refund.amount,
         reason=refund.reason,
@@ -512,3 +514,199 @@ async def calculate_tax_endpoint(
         tax_amount=tax_amount,
         total_with_tax=total_with_tax
     )
+
+@router.get("/pos-transactions", response_model=List[InvoiceSummary])
+async def get_pos_transactions(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    payment_status: Optional[str] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get POS transactions (invoices created through POS)"""
+    query = db.query(Invoice, Patient).join(
+        Patient, Invoice.patient_id == Patient.id
+    ).join(
+        AuditLog, and_(
+            AuditLog.resource_type == "INVOICE",
+            AuditLog.resource_id == Invoice.id,
+            AuditLog.action.in_(["POS_SALE", "QUICK_SALE"])
+        )
+    )
+    
+    if payment_status:
+        query = query.filter(Invoice.payment_status == payment_status)
+    
+    if date_from:
+        query = query.filter(Invoice.created_at >= date_from)
+    
+    if date_to:
+        query = query.filter(Invoice.created_at <= date_to)
+    
+    invoices = query.order_by(Invoice.created_at.desc()).offset(skip).limit(limit).all()
+    
+    result = []
+    for invoice, patient in invoices:
+        result.append(InvoiceSummary(
+            id=invoice.id,
+            invoice_number=invoice.invoice_number,
+            patient_id=invoice.patient_id,
+            patient_name=f"{patient.first_name} {patient.last_name}",
+            total_amount=invoice.total_amount,
+            payment_status=invoice.payment_status,
+            payment_mode=invoice.payment_mode,
+            created_at=invoice.created_at
+        ))
+    
+    return result
+
+@router.get("/held-bills")
+async def get_held_bills(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get all held bills from POS"""
+    
+    held_bills = db.query(HoldBill, User).join(
+        User, HoldBill.held_by == User.id
+    ).filter(
+        HoldBill.is_active == True
+    ).order_by(
+        HoldBill.held_at.desc()
+    ).all()
+    
+    result = []
+    for hold_bill, user in held_bills:
+        cart_data = json.loads(hold_bill.cart_data)
+        customer_info = json.loads(hold_bill.customer_info) if hold_bill.customer_info else None
+        
+        result.append({
+            "id": hold_bill.id,
+            "hold_number": hold_bill.hold_number,
+            "customer_name": customer_info.get("name", "Walk-in Customer") if customer_info else "Walk-in Customer",
+            "total_amount": cart_data.get("total_amount", 0),
+            "items_count": len(cart_data.get("items", [])),
+            "held_by": user.full_name,
+            "held_at": hold_bill.held_at,
+            "hold_reason": hold_bill.hold_reason,
+            "status": "HELD"
+        })
+    
+    return result
+
+@router.get("/all-transactions")
+async def get_all_transactions(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    payment_status: Optional[str] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get all transactions including regular invoices, POS transactions, and held bills"""
+    
+    # Get regular invoices
+    invoices_query = db.query(Invoice, Patient).join(
+        Patient, Invoice.patient_id == Patient.id
+    )
+    
+    if payment_status:
+        invoices_query = invoices_query.filter(Invoice.payment_status == payment_status)
+    
+    if date_from:
+        invoices_query = invoices_query.filter(Invoice.created_at >= date_from)
+    
+    if date_to:
+        invoices_query = invoices_query.filter(Invoice.created_at <= date_to)
+    
+    invoices = invoices_query.order_by(Invoice.created_at.desc()).offset(skip).limit(limit).all()
+    
+    # Get POS transactions (invoices with POS audit logs)
+    pos_query = db.query(Invoice, Patient).join(
+        Patient, Invoice.patient_id == Patient.id
+    ).join(
+        AuditLog, and_(
+            AuditLog.resource_type == "INVOICE",
+            AuditLog.resource_id == Invoice.id,
+            AuditLog.action.in_(["POS_SALE", "QUICK_SALE"])
+        )
+    )
+    
+    if payment_status:
+        pos_query = pos_query.filter(Invoice.payment_status == payment_status)
+    
+    if date_from:
+        pos_query = pos_query.filter(Invoice.created_at >= date_from)
+    
+    if date_to:
+        pos_query = pos_query.filter(Invoice.created_at <= date_to)
+    
+    pos_invoices = pos_query.order_by(Invoice.created_at.desc()).offset(skip).limit(limit).all()
+    
+    # Get held bills
+    held_query = db.query(HoldBill, User).join(
+        User, HoldBill.held_by == User.id
+    ).filter(HoldBill.is_active == True)
+    
+    if date_from:
+        held_query = held_query.filter(HoldBill.held_at >= date_from)
+    
+    if date_to:
+        held_query = held_query.filter(HoldBill.held_at <= date_to)
+    
+    held_bills = held_query.order_by(HoldBill.held_at.desc()).offset(skip).limit(limit).all()
+    
+    # Combine all results
+    result = []
+    
+    # Add regular invoices
+    for invoice, patient in invoices:
+        result.append({
+            "id": invoice.id,
+            "type": "invoice",
+            "invoice_number": invoice.invoice_number,
+            "patient_name": f"{patient.first_name} {patient.last_name}",
+            "total_amount": invoice.total_amount,
+            "payment_status": invoice.payment_status,
+            "payment_mode": invoice.payment_mode,
+            "created_at": invoice.created_at
+        })
+    
+    # Add POS transactions
+    for invoice, patient in pos_invoices:
+        result.append({
+            "id": invoice.id,
+            "type": "pos",
+            "invoice_number": invoice.invoice_number,
+            "patient_name": f"{patient.first_name} {patient.last_name}",
+            "total_amount": invoice.total_amount,
+            "payment_status": invoice.payment_status,
+            "payment_mode": invoice.payment_mode,
+            "created_at": invoice.created_at
+        })
+    
+    # Add held bills
+    for hold_bill, user in held_bills:
+        cart_data = json.loads(hold_bill.cart_data)
+        customer_info = json.loads(hold_bill.customer_info) if hold_bill.customer_info else None
+        
+        result.append({
+            "id": hold_bill.id,
+            "type": "held",
+            "hold_number": hold_bill.hold_number,
+            "customer_name": customer_info.get("name", "Walk-in Customer") if customer_info else "Walk-in Customer",
+            "total_amount": cart_data.get("total_amount", 0),
+            "items_count": len(cart_data.get("items", [])),
+            "status": "HELD",
+            "held_by": user.full_name,
+            "held_at": hold_bill.held_at,
+            "created_at": hold_bill.held_at
+        })
+    
+    # Sort all results by date
+    result.sort(key=lambda x: x.get("created_at") or x.get("held_at"), reverse=True)
+    
+    return result

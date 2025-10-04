@@ -27,6 +27,14 @@ const Reports = () => {
     }
   );
 
+  const { data: posDailySummary, isLoading: posLoading, error: posError } = useQuery(
+    'pos-daily-summary',
+    () => api.get(endpoints.POS.DAILY_SUMMARY).then(res => res.data),
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
+
   const { data: patientStats, error: patientError } = useQuery(
     'patient-stats',
     () => api.get(endpoints.REPORTS.PATIENTS).then(res => res.data),
@@ -173,59 +181,151 @@ const Reports = () => {
             {salesLoading ? (
               <Loader text="Loading sales data..." />
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <CurrencyDollarIcon className="h-6 w-6 text-green-500" />
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <CurrencyDollarIcon className="h-6 w-6 text-green-500" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Total Sales</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          ${(salesData?.total_sales || 0).toFixed(2)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-500">Total Sales</p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        ${salesData?.total_sales?.toFixed(2) || '0.00'}
-                      </p>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <DocumentTextIcon className="h-6 w-6 text-blue-500" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Total Orders</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {salesData?.total_invoices || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <ClockIcon className="h-6 w-6 text-yellow-500" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Avg. Order Value</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          ${(salesData?.average_invoice_value || 0).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <CalendarIcon className="h-6 w-6 text-purple-500" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Report Period</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          Last 7 days
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <DocumentTextIcon className="h-6 w-6 text-blue-500" />
+                
+                {/* POS Daily Summary */}
+                <div className="mt-6">
+                  <h3 className="text-md font-medium text-gray-900 mb-3">POS Transaction Summary</h3>
+                  {posLoading ? (
+                    <Loader text="Loading POS data..." />
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <CurrencyDollarIcon className="h-6 w-6 text-blue-500" />
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-500">Cash Sales</p>
+                            <p className="text-lg font-semibold text-gray-900">
+                              ${(posDailySummary?.cash_sales || 0).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <DocumentTextIcon className="h-6 w-6 text-green-500" />
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-500">Card Sales</p>
+                            <p className="text-lg font-semibold text-gray-900">
+                              ${(posDailySummary?.card_sales || 0).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-purple-50 p-4 rounded-lg">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <UserIcon className="h-6 w-6 text-purple-500" />
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-500">Insurance Sales</p>
+                            <p className="text-lg font-semibold text-gray-900">
+                              ${(posDailySummary?.insurance_sales || 0).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-yellow-50 p-4 rounded-lg">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <CubeIcon className="h-6 w-6 text-yellow-500" />
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-500">Online Sales</p>
+                            <p className="text-lg font-semibold text-gray-900">
+                              ${(posDailySummary?.online_sales || 0).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-500">Total Orders</p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        {salesData?.total_orders || 0}
-                      </p>
+                  )}
+                </div>
+                
+                {/* Top Medicines from POS */}
+                {posDailySummary?.top_medicines && posDailySummary.top_medicines.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-md font-medium text-gray-900 mb-3">Top Selling Medicines (POS)</h3>
+                    <div className="bg-white border rounded-lg overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Medicine</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Revenue</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {posDailySummary.top_medicines.slice(0, 5).map((medicine, index) => (
+                            <tr key={index}>
+                              <td className="px-4 py-2 text-sm text-gray-900">{medicine.name}</td>
+                              <td className="px-4 py-2 text-sm text-gray-500">{medicine.quantity}</td>
+                              <td className="px-4 py-2 text-sm text-gray-500">${medicine.revenue.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <ClockIcon className="h-6 w-6 text-yellow-500" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-500">Avg. Order Value</p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        ${salesData?.avg_order_value?.toFixed(2) || '0.00'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <CalendarIcon className="h-6 w-6 text-purple-500" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-500">Report Period</p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        {formatDate(salesData?.start_date)} - {formatDate(salesData?.end_date)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             )}
           </div>
@@ -256,7 +356,7 @@ const Reports = () => {
                     <div className="ml-3">
                       <p className="text-sm font-medium text-gray-500">New Patients</p>
                       <p className="text-lg font-semibold text-gray-900">
-                        {patientStats?.new_patients || 0}
+                        {patientStats?.new_patients_this_month || 0}
                       </p>
                     </div>
                   </div>
@@ -267,9 +367,9 @@ const Reports = () => {
                       <DocumentTextIcon className="h-6 w-6 text-purple-500" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-500">Active Prescriptions</p>
+                      <p className="text-sm font-medium text-gray-500">Patients with Prescriptions</p>
                       <p className="text-lg font-semibold text-gray-900">
-                        {patientStats?.active_prescriptions || 0}
+                        {patientStats?.patients_with_prescriptions || 0}
                       </p>
                     </div>
                   </div>
@@ -319,7 +419,7 @@ const Reports = () => {
                     <div className="ml-3">
                       <p className="text-sm font-medium text-gray-500">Expiring Soon</p>
                       <p className="text-lg font-semibold text-gray-900">
-                        {inventoryStats?.expiring_soon || 0}
+                        {inventoryStats?.expiring_items || 0}
                       </p>
                     </div>
                   </div>
@@ -332,7 +432,7 @@ const Reports = () => {
                     <div className="ml-3">
                       <p className="text-sm font-medium text-gray-500">Total Value</p>
                       <p className="text-lg font-semibold text-gray-900">
-                        ${inventoryStats?.total_value?.toFixed(2) || '0.00'}
+                        ${(inventoryStats?.total_inventory_value || 0).toFixed(2)}
                       </p>
                     </div>
                   </div>

@@ -16,10 +16,35 @@ import Loader from '../../components/Loader';
 const Billing = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'invoices', 'pos', 'held'
 
-  const { data: invoices, isLoading } = useQuery(
+  const { data: invoices, isLoading: invoicesLoading } = useQuery(
     'invoices',
     () => api.get(endpoints.BILLING.INVOICES).then(res => res.data),
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const { data: posTransactions, isLoading: posLoading } = useQuery(
+    'pos-transactions',
+    () => api.get(endpoints.BILLING.POS_TRANSACTIONS).then(res => res.data),
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const { data: heldBills, isLoading: heldLoading } = useQuery(
+    'held-bills',
+    () => api.get(endpoints.BILLING.HELD_BILLS).then(res => res.data),
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const { data: allTransactions, isLoading: allLoading } = useQuery(
+    'all-transactions',
+    () => api.get(endpoints.BILLING.ALL_TRANSACTIONS).then(res => res.data),
     {
       refetchOnWindowFocus: false,
     }
@@ -33,26 +58,65 @@ const Billing = () => {
     }
   );
 
-  const filteredInvoices = invoices?.filter(invoice => {
+  // Combine all data based on active tab
+  const getAllData = () => {
+    switch (activeTab) {
+      case 'invoices':
+        return invoices || [];
+      case 'pos':
+        return posTransactions || [];
+      case 'held':
+        return heldBills || [];
+      default:
+        // For 'all' tab, combine all data if unified endpoint doesn't work
+        if (allTransactions && allTransactions.length > 0) {
+          return allTransactions;
+        }
+        // Fallback to combining individual data sources
+        const allInvoices = invoices || [];
+        const allPos = posTransactions || [];
+        const allHeld = heldBills || [];
+        return [...allInvoices, ...allPos, ...allHeld];
+    }
+  };
+
+  const filteredData = getAllData().filter(item => {
     const matchesSearch =
-      invoice.invoice_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (invoice.patient && invoice.patient.full_name.toLowerCase().includes(searchTerm.toLowerCase()));
+      item.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.patient_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.hold_number?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' ||
+                         item.payment_status === statusFilter ||
+                         item.status === statusFilter;
     
     return matchesSearch && matchesStatus;
   }) || [];
 
+  // Debug logging for the all tab
+  React.useEffect(() => {
+    if (activeTab === 'all') {
+      console.log('All Transactions Data:', allTransactions);
+      console.log('Invoices Data:', invoices);
+      console.log('POS Transactions Data:', posTransactions);
+      console.log('Held Bills Data:', heldBills);
+      console.log('Combined Data:', getAllData());
+    }
+  }, [activeTab, allTransactions, invoices, posTransactions, heldBills]);
+
   const getStatusColor = (status) => {
     switch (status) {
-      case 'paid':
+      case 'PAID':
         return 'bg-green-100 text-green-800';
-      case 'pending':
+      case 'PENDING':
         return 'bg-yellow-100 text-yellow-800';
-      case 'overdue':
+      case 'PARTIAL':
+        return 'bg-blue-100 text-blue-800';
+      case 'REFUNDED':
         return 'bg-red-100 text-red-800';
-      case 'cancelled':
-        return 'bg-gray-100 text-gray-800';
+      case 'HELD':
+        return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -60,12 +124,16 @@ const Billing = () => {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'paid':
+      case 'PAID':
         return <CheckCircleIcon className="h-4 w-4 text-green-500" />;
-      case 'pending':
+      case 'PENDING':
         return <ClockIcon className="h-4 w-4 text-yellow-500" />;
-      case 'overdue':
+      case 'PARTIAL':
+        return <ClockIcon className="h-4 w-4 text-blue-500" />;
+      case 'REFUNDED':
         return <ExclamationTriangleIcon className="h-4 w-4 text-red-500" />;
+      case 'HELD':
+        return <DocumentTextIcon className="h-4 w-4 text-purple-500" />;
       default:
         return <DocumentTextIcon className="h-4 w-4 text-gray-500" />;
     }
@@ -74,20 +142,32 @@ const Billing = () => {
   const getPatientName = (patientId) => {
     if (!patients) return '';
     const patient = patients.find(p => p.id === patientId);
-    return patient ? patient.full_name : '';
+    return patient ? `${patient.first_name} ${patient.last_name}` : '';
   };
 
   const getOverdueCount = () => {
-    return invoices?.filter(invoice => invoice.status === 'overdue').length || 0;
+    const allData = getAllData();
+    return allData?.filter(item =>
+      item.payment_status === 'REFUNDED' || item.status === 'REFUNDED'
+    ).length || 0;
   };
 
   const getPendingCount = () => {
-    return invoices?.filter(invoice => invoice.status === 'pending').length || 0;
+    const allData = getAllData();
+    return allData?.filter(item =>
+      item.payment_status === 'PENDING' || item.status === 'PENDING'
+    ).length || 0;
+  };
+
+  const getHeldCount = () => {
+    return heldBills?.length || 0;
   };
 
   const getTotalRevenue = () => {
-    return invoices?.filter(invoice => invoice.status === 'paid')
-      .reduce((sum, invoice) => sum + (invoice.total_amount || 0), 0) || 0;
+    const allData = getAllData();
+    return allData?.filter(item =>
+      item.payment_status === 'PAID' || item.status === 'PAID'
+    ).reduce((sum, item) => sum + (item.total_amount || 0), 0) || 0;
   };
 
   return (
@@ -108,6 +188,52 @@ const Billing = () => {
             New Invoice
           </Link>
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'all'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            All Transactions
+          </button>
+          <button
+            onClick={() => setActiveTab('invoices')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'invoices'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Regular Invoices
+          </button>
+          <button
+            onClick={() => setActiveTab('pos')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'pos'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            POS Transactions
+          </button>
+          <button
+            onClick={() => setActiveTab('held')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'held'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Held Bills ({getHeldCount()})
+          </button>
+        </nav>
       </div>
 
       {/* Stats Cards */}
@@ -181,10 +307,10 @@ const Billing = () => {
               <div className="ml-5 w-0 flex-1">
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Invoices
+                    Total Transactions
                   </dt>
                   <dd className="text-lg font-semibold text-gray-900">
-                    {invoices?.length || 0}
+                    {getAllData().length}
                   </dd>
                 </dl>
               </div>
@@ -226,10 +352,11 @@ const Billing = () => {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="all">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="paid">Paid</option>
-            <option value="overdue">Overdue</option>
-            <option value="cancelled">Cancelled</option>
+            <option value="PENDING">Pending</option>
+            <option value="PAID">Paid</option>
+            <option value="PARTIAL">Partial</option>
+            <option value="REFUNDED">Refunded</option>
+            <option value="HELD">Held</option>
           </select>
         </div>
       </div>
@@ -246,13 +373,13 @@ const Billing = () => {
                       scope="col"
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
-                      Invoice ID
+                      {activeTab === 'held' ? 'Hold Number' : (activeTab === 'all' ? 'Transaction ID' : 'Invoice ID')}
                     </th>
                     <th
                       scope="col"
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
-                      Patient
+                      Customer
                     </th>
                     <th
                       scope="col"
@@ -281,58 +408,90 @@ const Billing = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {isLoading ? (
+                  {(invoicesLoading || posLoading || heldLoading || allLoading) ? (
                     <tr>
                       <td colSpan="6" className="px-6 py-4 text-center">
-                        <Loader text="Loading invoices..." />
+                        <Loader text="Loading transactions..." />
                       </td>
                     </tr>
-                  ) : filteredInvoices.length > 0 ? (
-                    filteredInvoices.map((invoice) => (
-                      <tr key={invoice.id} className="hover:bg-gray-50">
+                  ) : filteredData.length > 0 ? (
+                    filteredData.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {invoice.invoice_id}
+                          {item.invoice_number || item.hold_number}
+                          {item.type === 'pos' && (
+                            <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">POS</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {getPatientName(invoice.patient_id)}
+                          {item.patient_name || item.customer_name}
+                          {(activeTab === 'held' || item.type === 'held') && item.items_count && (
+                            <div className="text-xs text-gray-400">
+                              {item.items_count} items
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(invoice.created_at).toLocaleDateString()}
+                          {new Date(item.created_at || item.held_at).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          ${invoice.total_amount?.toFixed(2) || '0.00'}
+                          ${item.total_amount?.toFixed(2) || '0.00'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            {getStatusIcon(invoice.status)}
-                            <span className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(invoice.status)}`}>
-                              {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                            {getStatusIcon(item.payment_status || item.status)}
+                            <span className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(item.payment_status || item.status)}`}>
+                              {(item.payment_status || item.status)?.charAt(0).toUpperCase() + (item.payment_status || item.status)?.slice(1)}
                             </span>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end space-x-2">
-                            <Link
-                              to={`/billing/invoices/${invoice.id}`}
-                              className="text-primary-600 hover:text-primary-900"
-                            >
-                              View
-                            </Link>
-                            {invoice.status === 'pending' && (
-                              <Link
-                                to={`/billing/invoices/${invoice.id}/edit`}
-                                className="text-primary-600 hover:text-primary-900"
-                              >
-                                Edit
-                              </Link>
-                            )}
-                            {invoice.status === 'pending' && (
-                              <Link
-                                to={`/billing/invoices/${invoice.id}/payments`}
-                                className="text-primary-600 hover:text-primary-900"
-                              >
-                                Add Payment
-                              </Link>
+                            {item.type === 'held' || activeTab === 'held' ? (
+                              <>
+                                <Link
+                                  to={`/pos/hold/${item.id}`}
+                                  className="text-primary-600 hover:text-primary-900"
+                                >
+                                  Resume
+                                </Link>
+                                <button
+                                  className="text-red-600 hover:text-red-900"
+                                  onClick={() => {
+                                    // Handle delete held bill
+                                    if (window.confirm('Are you sure you want to delete this held bill?')) {
+                                      // API call to delete held bill
+                                    }
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <Link
+                                  to={`/billing/invoices/${item.id}`}
+                                  className="text-primary-600 hover:text-primary-900"
+                                >
+                                  View
+                                </Link>
+                                {(item.payment_status === 'PENDING' || item.status === 'PENDING') && (
+                                  <Link
+                                    to={`/billing/invoices/${item.id}/edit`}
+                                    className="text-primary-600 hover:text-primary-900"
+                                  >
+                                    Edit
+                                  </Link>
+                                )}
+                                {(item.payment_status === 'PENDING' || item.status === 'PENDING') && (
+                                  <Link
+                                    to={`/billing/invoices/${item.id}/payments`}
+                                    className="text-primary-600 hover:text-primary-900"
+                                  >
+                                    Add Payment
+                                  </Link>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>
@@ -341,7 +500,7 @@ const Billing = () => {
                   ) : (
                     <tr>
                       <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
-                        No invoices found.
+                        No {activeTab === 'held' ? 'held bills' : activeTab === 'pos' ? 'POS transactions' : activeTab === 'invoices' ? 'invoices' : 'transactions'} found.
                       </td>
                     </tr>
                   )}

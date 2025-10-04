@@ -27,6 +27,9 @@ class InvoiceItemWithDetails(InvoiceItem):
     medicine_name: str
     batch_number: str
     prescription_number: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
 
 class InvoiceBase(BaseModel):
     patient_id: int

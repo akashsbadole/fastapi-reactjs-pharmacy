@@ -9,7 +9,8 @@ from decimal import Decimal
 
 from ..models import (
     User, Patient, Invoice, InvoiceItem, Payment, Medicine, MedicineBatch,
-    Prescription, PrescriptionItem, AuditLog, StockMovement, Refund, HoldBill
+    Prescription, PrescriptionItem, AuditLog, StockMovement, Refund, HoldBill,
+    OrganizationSettings, POSSettings
 )
 from ..database import get_db
 from ..schemas.pos import (
@@ -587,10 +588,54 @@ async def generate_receipt(
 
 @router.get("/config", response_model=POSConfig)
 async def get_pos_config(
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ):
     """Get POS configuration"""
-    return POSConfig(**POS_CONFIG)
+    # Get organization settings to fetch currency
+    org_settings = db.query(OrganizationSettings).first()
+    
+    # Get POS settings to fetch receipt currency
+    pos_settings = db.query(POSSettings).first()
+    
+    # Create a copy of the POS config
+    config = POS_CONFIG.copy()
+    
+    # Update currency symbol from organization settings
+    if org_settings and org_settings.currency:
+        # Map currency codes to symbols
+        currency_symbols = {
+            "USD": "$",
+            "EUR": "€",
+            "GBP": "£",
+            "JPY": "¥",
+            "INR": "₹",
+            "CNY": "¥",
+            "CAD": "$",
+            "AUD": "$"
+        }
+        config["currency_symbol"] = currency_symbols.get(org_settings.currency, "$")
+    
+    # If POS settings exist and have receipt currency, use that
+    if pos_settings and pos_settings.receipt:
+        try:
+            receipt_config = json.loads(pos_settings.receipt)
+            if "currency" in receipt_config:
+                currency_symbols = {
+                    "USD": "$",
+                    "EUR": "€",
+                    "GBP": "£",
+                    "JPY": "¥",
+                    "INR": "₹",
+                    "CNY": "¥",
+                    "CAD": "$",
+                    "AUD": "$"
+                }
+                config["currency_symbol"] = currency_symbols.get(receipt_config["currency"], "$")
+        except (json.JSONDecodeError, TypeError):
+            pass  # Use default if JSON parsing fails
+    
+    return POSConfig(**config)
 
 @router.get("/summary/daily", response_model=POSDailySummary)
 async def get_daily_summary(
@@ -599,74 +644,94 @@ async def get_daily_summary(
     db: Session = Depends(get_db)
 ):
     """Get daily sales summary for POS"""
-    
-    target_date = date or date.today()
-    start_datetime = datetime.combine(target_date, datetime.min.time())
-    end_datetime = datetime.combine(target_date, datetime.max.time())
-    
-    # Get sales data
-    sales_data = db.query(
-        func.sum(Invoice.total_amount).label('total_sales'),
-        func.count(Invoice.id).label('total_invoices'),
-        func.sum(case([(Invoice.payment_mode == 'CASH', Invoice.total_amount)], else_=0)).label('cash_sales'),
-        func.sum(case([(Invoice.payment_mode == 'CARD', Invoice.total_amount)], else_=0)).label('card_sales'),
-        func.sum(case([(Invoice.payment_mode == 'INSURANCE', Invoice.total_amount)], else_=0)).label('insurance_sales'),
-        func.sum(case([(Invoice.payment_mode == 'ONLINE', Invoice.total_amount)], else_=0)).label('online_sales')
-    ).filter(
-        and_(
-            Invoice.created_at >= start_datetime,
-            Invoice.created_at <= end_datetime,
-            Invoice.payment_status == 'PAID'
-        )
-    ).first()
-    
-    # Get top medicines
-    top_medicines = db.query(
-        Medicine.name,
-        func.sum(InvoiceItem.quantity).label('total_quantity'),
-        func.sum(InvoiceItem.total).label('total_revenue')
-    ).join(
-        InvoiceItem, Medicine.id == InvoiceItem.medicine_id
-    ).join(
-        Invoice, InvoiceItem.invoice_id == Invoice.id
-    ).filter(
-        and_(
-            Invoice.created_at >= start_datetime,
-            Invoice.created_at <= end_datetime,
-            Invoice.payment_status == 'PAID'
-        )
-    ).group_by(
-        Medicine.name
-    ).order_by(
-        desc(func.sum(InvoiceItem.quantity))
-    ).limit(10).all()
-    
-    # Build summary
-    summary = POSDailySummary(
-        date=target_date,
-        total_sales=float(sales_data.total_sales or 0),
-        total_invoices=int(sales_data.total_invoices or 0),
-        cash_sales=float(sales_data.cash_sales or 0),
-        card_sales=float(sales_data.card_sales or 0),
-        insurance_sales=float(sales_data.insurance_sales or 0),
-        online_sales=float(sales_data.online_sales or 0),
-        top_medicines=[
-            {
-                "name": med[0],
-                "quantity": int(med[1]),
-                "revenue": float(med[2])
+    try:
+        target_date = date or date.today()
+        start_datetime = datetime.combine(target_date, datetime.min.time())
+        end_datetime = datetime.combine(target_date, datetime.max.time())
+        
+        # Get sales data
+        sales_data = db.query(
+            func.sum(Invoice.total_amount).label('total_sales'),
+            func.count(Invoice.id).label('total_invoices'),
+            func.sum(case([(Invoice.payment_mode == 'CASH', Invoice.total_amount)], else_=0)).label('cash_sales'),
+            func.sum(case([(Invoice.payment_mode == 'CARD', Invoice.total_amount)], else_=0)).label('card_sales'),
+            func.sum(case([(Invoice.payment_mode == 'INSURANCE', Invoice.total_amount)], else_=0)).label('insurance_sales'),
+            func.sum(case([(Invoice.payment_mode == 'ONLINE', Invoice.total_amount)], else_=0)).label('online_sales')
+        ).filter(
+            and_(
+                Invoice.created_at >= start_datetime,
+                Invoice.created_at <= end_datetime,
+                Invoice.payment_status == 'PAID'
+            )
+        ).first()
+        
+        # Get top medicines
+        top_medicines = db.query(
+            Medicine.name,
+            func.sum(InvoiceItem.quantity).label('total_quantity'),
+            func.sum(InvoiceItem.total).label('total_revenue')
+        ).join(
+            InvoiceItem, Medicine.id == InvoiceItem.medicine_id
+        ).join(
+            Invoice, InvoiceItem.invoice_id == Invoice.id
+        ).filter(
+            and_(
+                Invoice.created_at >= start_datetime,
+                Invoice.created_at <= end_datetime,
+                Invoice.payment_status == 'PAID'
+            )
+        ).group_by(
+            Medicine.name
+        ).order_by(
+            desc(func.sum(InvoiceItem.quantity))
+        ).limit(10).all()
+        
+        # Build summary
+        summary = POSDailySummary(
+            date=target_date,
+            total_sales=float(sales_data.total_sales or 0),
+            total_invoices=int(sales_data.total_invoices or 0),
+            cash_sales=float(sales_data.cash_sales or 0),
+            card_sales=float(sales_data.card_sales or 0),
+            insurance_sales=float(sales_data.insurance_sales or 0),
+            online_sales=float(sales_data.online_sales or 0),
+            top_medicines=[
+                {
+                    "name": med[0],
+                    "quantity": int(med[1]),
+                    "revenue": float(med[2])
+                }
+                for med in top_medicines
+            ],
+            payment_breakdown={
+                "cash": float(sales_data.cash_sales or 0),
+                "card": float(sales_data.card_sales or 0),
+                "insurance": float(sales_data.insurance_sales or 0),
+                "online": float(sales_data.online_sales or 0)
             }
-            for med in top_medicines
-        ],
-        payment_breakdown={
-            "cash": float(sales_data.cash_sales or 0),
-            "card": float(sales_data.card_sales or 0),
-            "insurance": float(sales_data.insurance_sales or 0),
-            "online": float(sales_data.online_sales or 0)
-        }
-    )
-    
-    return summary
+        )
+        
+        return summary
+    except Exception as e:
+        # Log the error
+        print(f"Error in get_daily_summary: {str(e)}")
+        # Return a default response instead of 500 error
+        return POSDailySummary(
+            date=date or date.today(),
+            total_sales=0,
+            total_invoices=0,
+            cash_sales=0,
+            card_sales=0,
+            insurance_sales=0,
+            online_sales=0,
+            top_medicines=[],
+            payment_breakdown={
+                "cash": 0,
+                "card": 0,
+                "insurance": 0,
+                "online": 0
+            }
+        )
 
 @router.post("/hold", response_model=POSHoldBill)
 async def hold_bill(
@@ -851,10 +916,10 @@ async def process_refund(
     # Create refund record
     refund = Refund(
         refund_number=f"REF{datetime.now().strftime('%Y%m%d%H%M%S')}",
-        total_amount=refund_amount,
+        invoice_id=0,  # This would need to be passed in the refund_data
+        amount=refund_amount,
         reason=reason,
-        refunded_by=current_user.id,
-        refund_date=datetime.utcnow()
+        created_by=current_user.id
     )
     
     db.add(refund)

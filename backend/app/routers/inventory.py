@@ -145,7 +145,7 @@ async def create_medicine(
     
     return db_medicine
 
-@router.get("/medicines", response_model=List[MedicineSchema])
+@router.get("/medicines")
 async def list_medicines(
     skip: int = 0,
     limit: int = 100,
@@ -170,7 +170,42 @@ async def list_medicines(
         query = query.filter(Medicine.category == category)
     
     medicines = query.offset(skip).limit(limit).all()
-    return medicines
+    
+    # Calculate total stock and average selling price from batches for each medicine
+    result = []
+    for medicine in medicines:
+        # Get all active batches for this medicine
+        batches = db.query(MedicineBatch).filter(
+            and_(
+                MedicineBatch.medicine_id == medicine.id,
+                MedicineBatch.is_active == True
+            )
+        ).all()
+        
+        # Calculate total stock
+        total_stock = sum(batch.current_stock for batch in batches)
+        
+        # Calculate average selling price from batches
+        avg_selling_price = 0
+        if batches:
+            # Weighted average based on stock quantity
+            total_value = sum(batch.selling_price * batch.current_stock for batch in batches if batch.current_stock > 0)
+            total_quantity = sum(batch.current_stock for batch in batches if batch.current_stock > 0)
+            if total_quantity > 0:
+                avg_selling_price = total_value / total_quantity
+        
+        # Create medicine dict with calculated values
+        medicine_dict = medicine.__dict__.copy()
+        medicine_dict['total_stock'] = total_stock
+        medicine_dict['price'] = avg_selling_price
+        
+        # Remove SQLAlchemy internal state
+        if '_sa_instance_state' in medicine_dict:
+            del medicine_dict['_sa_instance_state']
+        
+        result.append(medicine_dict)
+    
+    return result
 
 @router.get("/medicines/{medicine_id}", response_model=MedicineWithBatches)
 async def get_medicine(
