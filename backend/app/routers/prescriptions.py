@@ -565,9 +565,9 @@ async def get_medicines_for_creation(
             "name": medicine.name,
             "generic_name": medicine.generic_name,
             "strength": medicine.strength,
-            "unit": medicine.unit,
+            "dosage_form": medicine.dosage_form,
             "requires_prescription": medicine.requires_prescription,
-            "price": medicine.price
+            "price": medicine.selling_price
         }
         for medicine in medicines
     ]

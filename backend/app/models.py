@@ -42,6 +42,9 @@ class User(Base):
     phone = Column(String)
     role = Column(Enum(UserRole), default=UserRole.CASHIER)
     is_active = Column(Boolean, default=True)
+    profile_image = Column(String)  # URL to profile image
+    two_factor_enabled = Column(Boolean, default=False)  # Two-factor authentication status
+    two_factor_secret = Column(String)  # Secret key for 2FA
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_login = Column(DateTime(timezone=True))

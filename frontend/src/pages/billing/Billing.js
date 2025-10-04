@@ -416,7 +416,7 @@ const Billing = () => {
                     </tr>
                   ) : filteredData.length > 0 ? (
                     filteredData.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
+                      <tr key={`${item.type}-${item.id}`} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {item.invoice_number || item.hold_number}
                           {item.type === 'pos' && (

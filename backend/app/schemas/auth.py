@@ -24,6 +24,8 @@ class UserUpdate(BaseModel):
 class User(UserBase):
     id: int
     is_active: bool
+    profile_image: Optional[str] = None
+    two_factor_enabled: bool = False
     created_at: datetime
     updated_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
@@ -58,3 +60,20 @@ class StaffLoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: User
+
+class ProfileImageUpload(BaseModel):
+    profile_image: str
+
+class TwoFactorSetup(BaseModel):
+    two_factor_enabled: bool
+    two_factor_secret: Optional[str] = None
+
+class TwoFactorVerify(BaseModel):
+    code: str
+
+class ForgotPassword(BaseModel):
+    email: str
+
+class ResetPassword(BaseModel):
+    token: str
+    new_password: str

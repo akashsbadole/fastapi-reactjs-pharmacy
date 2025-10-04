@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
-import api from '../../services/api';
+import api, { endpoints } from '../../services/api';
 
 const EditInvoice = () => {
   const { id } = useParams();
@@ -17,7 +17,7 @@ const EditInvoice = () => {
     const fetchInvoiceDetails = async () => {
       try {
         setLoading(true);
-        const response = await api.get(`/billing/${id}`);
+        const response = await api.get(endpoints.BILLING.INVOICE(id));
         setInvoice(response.data);
         
         // Set form values
@@ -26,7 +26,7 @@ const EditInvoice = () => {
         setValue('notes', response.data.notes);
         
         // Fetch payments for this invoice
-        const paymentsResponse = await api.get(`/billing/${id}/payments`);
+        const paymentsResponse = await api.get(endpoints.BILLING.PAYMENTS(id));
         setPayments(paymentsResponse.data);
       } catch (error) {
         console.error('Error fetching invoice details:', error);
@@ -43,7 +43,7 @@ const EditInvoice = () => {
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     try {
-      const response = await api.put(`/billing/${id}`, data);
+      const response = await api.put(endpoints.BILLING.INVOICE(id), data);
       toast.success('Invoice updated successfully');
       navigate(`/billing/invoices/${id}`);
     } catch (error) {
@@ -220,8 +220,8 @@ const EditInvoice = () => {
                     {...register('payment_mode')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="cash">Cash</option>
-                    <option value="card">Card</option>
+                    <option value="CASH">Cash</option>
+                    <option value="CARD">Card</option>
                     <option value="insurance">Insurance</option>
                   </select>
                 </div>

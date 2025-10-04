@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
-import api from '../../services/api';
+import api, { endpoints } from '../../services/api';
 
 const CreateInvoice = () => {
   const navigate = useNavigate();
@@ -117,7 +117,7 @@ const CreateInvoice = () => {
         payment_mode: data.payment_mode
       };
 
-      const response = await api.post('/billing/', invoiceData);
+      const response = await api.post(endpoints.BILLING.INVOICES, invoiceData);
       toast.success('Invoice created successfully');
       navigate(`/billing/invoices/${response.data.id}`);
     } catch (error) {
@@ -170,8 +170,8 @@ const CreateInvoice = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select Payment Mode</option>
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
+                  <option value="CASH">Cash</option>
+                  <option value="CARD">Card</option>
                   <option value="insurance">Insurance</option>
                 </select>
                 {errors.payment_mode && (

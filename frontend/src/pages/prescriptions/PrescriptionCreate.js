@@ -41,7 +41,7 @@ const PrescriptionCreate = () => {
   // Fetch medicines
   const { data: medicines, isLoading: medicinesLoading } = useQuery(
     'prescription-medicines',
-    () => api.get('/api/prescriptions/create/medicines').then(res => res.data),
+    () => api.get(endpoints.INVENTORY.MEDICINES).then(res => res.data),
     {
       refetchOnWindowFocus: false,
     }

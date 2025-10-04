@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { api, endpoints } from '../services/api';
 import {
   UserIcon,
@@ -9,11 +9,16 @@ import {
   LockClosedIcon,
   KeyIcon,
   DocumentTextIcon,
-  ClockIcon
+  ClockIcon,
+  CameraIcon,
+  ShieldCheckIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import Loader from '../components/Loader';
+import toast from 'react-hot-toast';
 
 const Profile = () => {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('personal');
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -22,12 +27,116 @@ const Profile = () => {
     phone: '',
     address: '',
   });
+  const [passwordData, setPasswordData] = useState({
+    current_password: '',
+    new_password: '',
+    confirm_password: '',
+  });
+  const [twoFactorSetup, setTwoFactorSetup] = useState({
+    secret: '',
+    provisioning_uri: '',
+    qr_code: '',
+    verification_code: '',
+  });
+  const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
 
   const { data: user, isLoading } = useQuery(
     'user-profile',
     () => api.get(endpoints.AUTH.ME).then(res => res.data),
     {
       refetchOnWindowFocus: false,
+    }
+  );
+
+  // Profile image upload mutation
+  const uploadProfileImage = useMutation(
+    (file) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return api.post(endpoints.AUTH.UPLOAD_PROFILE_IMAGE, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    },
+    {
+      onSuccess: (response) => {
+        toast.success('Profile image uploaded successfully');
+        // Refresh user data
+        queryClient.invalidateQueries('user-profile');
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.detail || 'Failed to upload profile image');
+      },
+    }
+  );
+
+  // Setup 2FA mutation
+  const setupTwoFactor = useMutation(
+    () => api.post(endpoints.AUTH.SETUP_2FA),
+    {
+      onSuccess: (response) => {
+        setTwoFactorSetup({
+          secret: response.data.secret,
+          provisioning_uri: response.data.provisioning_uri,
+          qr_code: response.data.qr_code,
+          verification_code: '',
+        });
+        setShowTwoFactorSetup(true);
+        toast.success('Two-factor authentication setup initiated');
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.detail || 'Failed to setup 2FA');
+      },
+    }
+  );
+
+  // Verify 2FA mutation
+  const verifyTwoFactor = useMutation(
+    (code) => api.post(endpoints.AUTH.VERIFY_2FA, { code }),
+    {
+      onSuccess: () => {
+        setShowTwoFactorSetup(false);
+        toast.success('Two-factor authentication enabled successfully');
+        // Refresh user data
+        queryClient.invalidateQueries('user-profile');
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.detail || 'Invalid verification code');
+      },
+    }
+  );
+
+  // Disable 2FA mutation
+  const disableTwoFactor = useMutation(
+    () => api.post(endpoints.AUTH.DISABLE_2FA),
+    {
+      onSuccess: () => {
+        toast.success('Two-factor authentication disabled successfully');
+        // Refresh user data
+        queryClient.invalidateQueries('user-profile');
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.detail || 'Failed to disable 2FA');
+      },
+    }
+  );
+
+  // Change password mutation
+  const changePassword = useMutation(
+    (passwordData) => api.post(endpoints.AUTH.CHANGE_PASSWORD, passwordData),
+    {
+      onSuccess: () => {
+        toast.success('Password changed successfully');
+        setPasswordData({
+          current_password: '',
+          new_password: '',
+          confirm_password: '',
+        });
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.detail || 'Failed to change password');
+      },
     }
   );
 
@@ -57,6 +166,35 @@ const Profile = () => {
 
   const handleCancel = () => {
     setIsEditing(false);
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      uploadProfileImage.mutate(file);
+    }
+  };
+
+  const handlePasswordChange = (e) => {
+    e.preventDefault();
+    if (passwordData.new_password !== passwordData.confirm_password) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    changePassword.mutate(passwordData);
+  };
+
+  const handleSetupTwoFactor = () => {
+    setupTwoFactor.mutate();
+  };
+
+  const handleVerifyTwoFactor = (e) => {
+    e.preventDefault();
+    verifyTwoFactor.mutate(twoFactorSetup.verification_code);
+  };
+
+  const handleDisableTwoFactor = () => {
+    disableTwoFactor.mutate();
   };
 
   if (isLoading) {
@@ -92,12 +230,30 @@ const Profile = () => {
       <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
         <div className="px-6 py-8 sm:p-8">
           <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center">
-                <span className="text-primary-800 text-xl font-bold">
-                  {user.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
-                </span>
-              </div>
+            <div className="flex-shrink-0 relative">
+              {user.profile_image ? (
+                <img
+                  className="h-16 w-16 rounded-full object-cover"
+                  src={user.profile_image.startsWith('http') ? user.profile_image : `http://localhost:8000${user.profile_image}`}
+                  alt={user.full_name}
+                />
+              ) : (
+                <div className="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center">
+                  <span className="text-primary-800 text-xl font-bold">
+                    {user.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
+                  </span>
+                </div>
+              )}
+              <label className="absolute bottom-0 right-0 bg-white rounded-full p-1 shadow-md cursor-pointer">
+                <CameraIcon className="h-4 w-4 text-gray-600" />
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={uploadProfileImage.isLoading}
+                />
+              </label>
             </div>
             <div className="ml-5">
               <h2 className="text-lg font-medium text-gray-900">
@@ -260,7 +416,7 @@ const Profile = () => {
                   <p className="mt-1 text-sm text-gray-500">
                     Update your password to keep your account secure.
                   </p>
-                  <div className="mt-4 space-y-4">
+                  <form onSubmit={handlePasswordChange} className="mt-4 space-y-4">
                     <div>
                       <label htmlFor="current_password" className="block text-sm font-medium text-gray-700">
                         Current Password
@@ -268,7 +424,10 @@ const Profile = () => {
                       <input
                         type="password"
                         id="current_password"
+                        value={passwordData.current_password}
+                        onChange={(e) => setPasswordData({...passwordData, current_password: e.target.value})}
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                        required
                       />
                     </div>
                     <div>
@@ -278,7 +437,10 @@ const Profile = () => {
                       <input
                         type="password"
                         id="new_password"
+                        value={passwordData.new_password}
+                        onChange={(e) => setPasswordData({...passwordData, new_password: e.target.value})}
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                        required
                       />
                     </div>
                     <div>
@@ -288,15 +450,22 @@ const Profile = () => {
                       <input
                         type="password"
                         id="confirm_password"
+                        value={passwordData.confirm_password}
+                        onChange={(e) => setPasswordData({...passwordData, confirm_password: e.target.value})}
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                        required
                       />
                     </div>
                     <div>
-                      <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                        Update Password
+                      <button
+                        type="submit"
+                        disabled={changePassword.isLoading}
+                        className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+                      >
+                        {changePassword.isLoading ? 'Updating...' : 'Update Password'}
                       </button>
                     </div>
-                  </div>
+                  </form>
                 </div>
 
                 <div>
@@ -305,15 +474,88 @@ const Profile = () => {
                     Add an extra layer of security to your account.
                   </p>
                   <div className="mt-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <KeyIcon className="h-5 w-5 text-gray-400" />
-                        <span className="ml-2 text-sm text-gray-900">Two-Factor Authentication</span>
+                    {showTwoFactorSetup ? (
+                      <div className="bg-gray-50 p-4 rounded-md">
+                        <div className="flex justify-between items-center mb-4">
+                          <h4 className="text-md font-medium text-gray-900">Setup Two-Factor Authentication</h4>
+                          <button
+                            onClick={() => setShowTwoFactorSetup(false)}
+                            className="text-gray-400 hover:text-gray-500"
+                          >
+                            <XMarkIcon className="h-5 w-5" />
+                          </button>
+                        </div>
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-sm text-gray-600 mb-2">
+                              Scan the QR code below with your authenticator app:
+                            </p>
+                            <div className="bg-white p-2 rounded-md flex justify-center">
+                              <div className="h-40 w-40 bg-gray-200 flex items-center justify-center">
+                                <span className="text-xs text-gray-500">QR Code Placeholder</span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2 text-center">
+                              Or enter this code manually: {twoFactorSetup.secret}
+                            </p>
+                          </div>
+                          <div>
+                            <label htmlFor="verification_code" className="block text-sm font-medium text-gray-700">
+                              Verification Code
+                            </label>
+                            <input
+                              type="text"
+                              id="verification_code"
+                              value={twoFactorSetup.verification_code}
+                              onChange={(e) => setTwoFactorSetup({...twoFactorSetup, verification_code: e.target.value})}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                              placeholder="Enter 6-digit code"
+                            />
+                          </div>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={handleVerifyTwoFactor}
+                              disabled={verifyTwoFactor.isLoading}
+                              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+                            >
+                              {verifyTwoFactor.isLoading ? 'Verifying...' : 'Verify & Enable'}
+                            </button>
+                            <button
+                              onClick={() => setShowTwoFactorSetup(false)}
+                              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <button className="text-sm font-medium text-primary-600 hover:text-primary-500">
-                        Enable
-                      </button>
-                    </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <ShieldCheckIcon className="h-5 w-5 text-gray-400" />
+                          <span className="ml-2 text-sm text-gray-900">
+                            Two-Factor Authentication {user.two_factor_enabled ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        {user.two_factor_enabled ? (
+                          <button
+                            onClick={handleDisableTwoFactor}
+                            disabled={disableTwoFactor.isLoading}
+                            className="text-sm font-medium text-red-600 hover:text-red-500 disabled:opacity-50"
+                          >
+                            {disableTwoFactor.isLoading ? 'Disabling...' : 'Disable'}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={handleSetupTwoFactor}
+                            disabled={setupTwoFactor.isLoading}
+                            className="text-sm font-medium text-primary-600 hover:text-primary-500 disabled:opacity-50"
+                          >
+                            {setupTwoFactor.isLoading ? 'Setting up...' : 'Enable'}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

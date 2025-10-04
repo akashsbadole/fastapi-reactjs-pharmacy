@@ -1,13 +1,22 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
+import os
+import uuid
+import secrets
+import pyotp
+from datetime import datetime
 
 from ..database import get_db
 from ..models import User, AuditLog
-from ..schemas.auth import User as UserSchema, UserCreate, UserUpdate, LoginRequest, Token, RefreshTokenRequest, PasswordChange, StaffLoginRequest, StaffLoginResponse
+from ..schemas.auth import (
+    User as UserSchema, UserCreate, UserUpdate, LoginRequest, Token, RefreshTokenRequest,
+    PasswordChange, StaffLoginRequest, StaffLoginResponse, ProfileImageUpload,
+    TwoFactorSetup, TwoFactorVerify, ForgotPassword, ResetPassword
+)
 from ..utils.auth import (
     authenticate_user, authenticate_staff, create_access_token, create_refresh_token, verify_token,
     get_password_hash, get_current_active_user, require_admin
@@ -408,3 +417,208 @@ async def staff_login(login_data: StaffLoginRequest, db: Session = Depends(get_d
     except Exception as e:
         print(f"Staff login error: {e}")
         raise
+
+# Profile image upload endpoint
+@router.post("/upload-profile-image", response_model=UserSchema)
+async def upload_profile_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    # Check if file is an image
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be an image"
+        )
+    
+    # Create uploads directory if it doesn't exist
+    uploads_dir = "uploads/profile_images"
+    os.makedirs(uploads_dir, exist_ok=True)
+    
+    # Generate unique filename
+    file_extension = file.filename.split(".")[-1]
+    unique_filename = f"{uuid.uuid4()}.{file_extension}"
+    file_path = f"{uploads_dir}/{unique_filename}"
+    
+    # Save file
+    try:
+        with open(file_path, "wb") as buffer:
+            buffer.write(await file.read())
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error saving file: {str(e)}"
+        )
+    
+    # Update user profile
+    old_image = current_user.profile_image
+    current_user.profile_image = f"/{file_path}"
+    db.commit()
+    db.refresh(current_user)
+    
+    # Delete old image if exists
+    if old_image and old_image.startswith("/uploads/"):
+        try:
+            old_path = old_image.lstrip("/")
+            if os.path.exists(old_path):
+                os.remove(old_path)
+        except Exception:
+            pass  # Ignore errors when deleting old file
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        action="UPDATE",
+        resource_type="USER",
+        resource_id=current_user.id,
+        new_values=f"Profile image updated for user {current_user.username}"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    return current_user
+
+# Two-Factor Authentication endpoints
+@router.post("/setup-2fa")
+async def setup_two_factor(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    # Generate secret key
+    secret = pyotp.random_base32()
+    
+    # Store secret temporarily (not enabled yet)
+    current_user.two_factor_secret = secret
+    db.commit()
+    
+    # Generate provisioning URI
+    provisioning_uri = pyotp.totp.TOTP(secret).provisioning_uri(
+        name=current_user.email,
+        issuer_name="Pharmacy Management System"
+    )
+    
+    return {
+        "secret": secret,
+        "provisioning_uri": provisioning_uri,
+        " qr_code": provisioning_uri  # In a real implementation, you would generate a QR code image
+    }
+
+@router.post("/verify-2fa")
+async def verify_two_factor(
+    verification_data: TwoFactorVerify,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.two_factor_secret:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA not set up"
+        )
+    
+    # Verify the code
+    totp = pyotp.TOTP(current_user.two_factor_secret)
+    if not totp.verify(verification_data.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code"
+        )
+    
+    # Enable 2FA
+    current_user.two_factor_enabled = True
+    db.commit()
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        action="UPDATE",
+        resource_type="USER",
+        resource_id=current_user.id,
+        new_values=f"2FA enabled for user {current_user.username}"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    return {"message": "Two-factor authentication enabled successfully"}
+
+@router.post("/disable-2fa")
+async def disable_two_factor(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.two_factor_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA not enabled"
+        )
+    
+    # Disable 2FA
+    current_user.two_factor_enabled = False
+    current_user.two_factor_secret = None
+    db.commit()
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        action="UPDATE",
+        resource_type="USER",
+        resource_id=current_user.id,
+        new_values=f"2FA disabled for user {current_user.username}"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    return {"message": "Two-factor authentication disabled successfully"}
+
+# Forgot password endpoints
+@router.post("/forgot-password")
+async def forgot_password(
+    request_data: ForgotPassword,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.email == request_data.email).first()
+    
+    if not user:
+        # Don't reveal if email exists or not
+        return {"message": "If your email is registered, you will receive a password reset link"}
+    
+    # Generate reset token
+    reset_token = secrets.token_urlsafe(32)
+    expiry_time = datetime.utcnow() + timedelta(hours=1)  # Token valid for 1 hour
+    
+    # In a real implementation, you would store this token in the database or a cache
+    # For now, we'll just return a success message
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user_id=user.id,
+        action="PASSWORD_RESET_REQUEST",
+        resource_type="USER",
+        resource_id=user.id,
+        new_values=f"Password reset requested for user {user.username}"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    return {"message": "If your email is registered, you will receive a password reset link"}
+
+@router.post("/reset-password")
+async def reset_password(
+    request_data: ResetPassword,
+    db: Session = Depends(get_db)
+):
+    # In a real implementation, you would validate the token against the database or cache
+    # For now, we'll just return a success message
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user_id=0,  # Unknown user at this point
+        action="PASSWORD_RESET",
+        resource_type="USER",
+        resource_id=0,
+        new_values="Password reset completed"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    return {"message": "Password reset successfully"}

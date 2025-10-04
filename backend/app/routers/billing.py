@@ -204,7 +204,7 @@ async def list_invoices(
     
     return result
 
-@router.get("/{invoice_id}", response_model=InvoiceWithDetails)
+@router.get("/invoices/{invoice_id}", response_model=InvoiceWithDetails)
 async def get_invoice(
     invoice_id: int,
     current_user: User = Depends(get_current_active_user),
@@ -251,7 +251,7 @@ async def get_invoice(
         created_by_name=creator.full_name
     )
 
-@router.put("/{invoice_id}", response_model=InvoiceSchema)
+@router.put("/invoices/{invoice_id}", response_model=InvoiceSchema)
 async def update_invoice(
     invoice_id: int,
     invoice_update: InvoiceUpdate,
@@ -286,7 +286,7 @@ async def update_invoice(
     
     return db_invoice
 
-@router.post("/{invoice_id}/payments", response_model=PaymentSchema)
+@router.post("/invoices/{invoice_id}/payments", response_model=PaymentSchema)
 async def create_payment(
     invoice_id: int,
     payment: PaymentCreate,
@@ -343,7 +343,7 @@ async def create_payment(
     
     return db_payment
 
-@router.get("/{invoice_id}/payments", response_model=List[PaymentSchema])
+@router.get("/invoices/{invoice_id}/payments", response_model=List[PaymentSchema])
 async def get_invoice_payments(
     invoice_id: int,
     current_user: User = Depends(get_current_active_user),
@@ -357,7 +357,74 @@ async def get_invoice_payments(
     payments = db.query(Payment).filter(Payment.invoice_id == invoice_id).all()
     return payments
 
-@router.post("/{invoice_id}/refund")
+@router.get("/invoices/{invoice_id}/prescriptions")
+async def get_invoice_prescriptions(
+    invoice_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    # Verify invoice exists
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Get prescriptions associated with this invoice through invoice items
+    prescriptions = db.query(
+        Prescription.id,
+        Prescription.prescription_number,
+        Prescription.created_at,
+        Prescription.patient_id,
+        func.sum(InvoiceItem.quantity * InvoiceItem.unit_price).label('amount')
+    ).join(
+        InvoiceItem, Prescription.id == InvoiceItem.prescription_id
+    ).filter(
+        InvoiceItem.invoice_id == invoice_id
+    ).group_by(
+        Prescription.id
+    ).all()
+    
+    # Get invoice items that are not linked to prescriptions (direct sales)
+    direct_items = db.query(
+        InvoiceItem.id,
+        Medicine.name,
+        InvoiceItem.quantity,
+        InvoiceItem.unit_price,
+        InvoiceItem.total,
+        InvoiceItem.created_at
+    ).join(
+        Medicine, InvoiceItem.medicine_id == Medicine.id
+    ).filter(
+        and_(
+            InvoiceItem.invoice_id == invoice_id,
+            InvoiceItem.prescription_id.is_(None)
+        )
+    ).all()
+    
+    result = []
+    
+    # Add prescriptions to result
+    for prescription in prescriptions:
+        result.append({
+            "id": prescription.id,
+            "prescription_id": prescription.prescription_number,
+            "created_at": prescription.created_at,
+            "amount": prescription.amount or 0.0,
+            "type": "prescription"
+        })
+    
+    # Add direct sale items to result
+    for item in direct_items:
+        result.append({
+            "id": item.id,
+            "prescription_id": f"Direct Sale - {item.name}",
+            "created_at": item.created_at,
+            "amount": item.total or 0.0,
+            "type": "direct_sale"
+        })
+    
+    return result
+
+@router.post("/invoices/{invoice_id}/refund")
 async def refund_invoice(
     invoice_id: int,
     refund: RefundCreate,
@@ -515,7 +582,7 @@ async def calculate_tax_endpoint(
         total_with_tax=total_with_tax
     )
 
-@router.get("/pos-transactions", response_model=List[InvoiceSummary])
+@router.get("/pos-transactions")
 async def get_pos_transactions(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
@@ -549,21 +616,24 @@ async def get_pos_transactions(
     
     result = []
     for invoice, patient in invoices:
-        result.append(InvoiceSummary(
-            id=invoice.id,
-            invoice_number=invoice.invoice_number,
-            patient_id=invoice.patient_id,
-            patient_name=f"{patient.first_name} {patient.last_name}",
-            total_amount=invoice.total_amount,
-            payment_status=invoice.payment_status,
-            payment_mode=invoice.payment_mode,
-            created_at=invoice.created_at
-        ))
+        result.append({
+            "id": invoice.id,
+            "type": "pos",
+            "invoice_number": invoice.invoice_number,
+            "patient_id": invoice.patient_id,
+            "patient_name": f"{patient.first_name} {patient.last_name}",
+            "total_amount": invoice.total_amount,
+            "payment_status": invoice.payment_status,
+            "payment_mode": invoice.payment_mode,
+            "created_at": invoice.created_at
+        })
     
     return result
 
 @router.get("/held-bills")
 async def get_held_bills(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -575,7 +645,7 @@ async def get_held_bills(
         HoldBill.is_active == True
     ).order_by(
         HoldBill.held_at.desc()
-    ).all()
+    ).offset(skip).limit(limit).all()
     
     result = []
     for hold_bill, user in held_bills:
@@ -584,6 +654,7 @@ async def get_held_bills(
         
         result.append({
             "id": hold_bill.id,
+            "type": "held",
             "hold_number": hold_bill.hold_number,
             "customer_name": customer_info.get("name", "Walk-in Customer") if customer_info else "Walk-in Customer",
             "total_amount": cart_data.get("total_amount", 0),
@@ -591,7 +662,8 @@ async def get_held_bills(
             "held_by": user.full_name,
             "held_at": hold_bill.held_at,
             "hold_reason": hold_bill.hold_reason,
-            "status": "HELD"
+            "status": "HELD",
+            "created_at": hold_bill.held_at
         })
     
     return result
@@ -668,6 +740,7 @@ async def get_all_transactions(
             "id": invoice.id,
             "type": "invoice",
             "invoice_number": invoice.invoice_number,
+            "patient_id": invoice.patient_id,
             "patient_name": f"{patient.first_name} {patient.last_name}",
             "total_amount": invoice.total_amount,
             "payment_status": invoice.payment_status,
@@ -681,6 +754,7 @@ async def get_all_transactions(
             "id": invoice.id,
             "type": "pos",
             "invoice_number": invoice.invoice_number,
+            "patient_id": invoice.patient_id,
             "patient_name": f"{patient.first_name} {patient.last_name}",
             "total_amount": invoice.total_amount,
             "payment_status": invoice.payment_status,

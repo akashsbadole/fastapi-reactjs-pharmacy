@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from app.database import get_db
 from app.utils.auth import get_current_user
-from app.schemas.auth import User as UserResponse
+from app.models import User
 from app.models import (
     OrganizationSettings, POSSettings, ThemeSettings,
     InventorySettings, NotificationSettings, IntegrationSettings,
@@ -128,7 +128,7 @@ async def test_settings():
 
 @router.get("/organization", summary="Get Organization Settings", description="Retrieve organization settings including store details, contact information, and formatting preferences")
 async def get_organization_settings(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get organization settings"""
@@ -188,7 +188,7 @@ async def get_organization_settings(
 
 @router.get("/pos", summary="Get POS Settings", description="Retrieve Point of Sale settings including payment methods, barcode scanning, receipt printing, and terminal configuration")
 async def get_pos_settings(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get POS settings"""
@@ -258,7 +258,7 @@ async def get_pos_settings(
 
 @router.get("/theme", summary="Get Theme Settings", description="Retrieve theme settings including color scheme, branding, UI preferences, and print settings")
 async def get_theme_settings(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get theme settings"""
@@ -328,7 +328,7 @@ async def get_theme_settings(
 @router.put("/organization")
 async def update_organization_settings(
     settings_data: OrganizationSettingsUpdate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update organization settings"""
@@ -484,7 +484,7 @@ async def update_organization_settings(
 @router.put("/pos")
 async def update_pos_settings(
     settings_data: POSSettingsUpdate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update POS settings"""
@@ -511,7 +511,7 @@ async def update_pos_settings(
 @router.put("/theme")
 async def update_theme_settings(
     settings_data: ThemeSettingsUpdate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update theme settings"""
@@ -537,7 +537,7 @@ async def update_theme_settings(
 
 @router.get("/inventory")
 async def get_inventory_settings(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get inventory settings"""
@@ -617,7 +617,7 @@ async def get_inventory_settings(
 
 @router.get("/notifications")
 async def get_notification_settings(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get notification settings"""
@@ -696,7 +696,7 @@ async def get_notification_settings(
 
 @router.get("/integrations")
 async def get_integration_settings(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get integration settings"""
@@ -794,7 +794,7 @@ async def get_integration_settings(
 
 @router.get("/compliance")
 async def get_compliance_settings(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get compliance settings"""
@@ -913,7 +913,7 @@ async def get_compliance_settings(
 
 @router.get("/backup")
 async def get_backup_settings(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get backup settings"""
@@ -992,7 +992,7 @@ async def get_backup_settings(
 
 @router.get("/users")
 async def get_user_roles_settings(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get user roles settings"""
@@ -1043,7 +1043,7 @@ async def get_user_roles_settings(
 @router.put("/inventory")
 async def update_inventory_settings(
     settings_data: InventorySettingsUpdate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update inventory settings"""
@@ -1073,7 +1073,7 @@ async def update_inventory_settings(
 @router.put("/notifications")
 async def update_notification_settings(
     settings_data: NotificationSettingsUpdate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update notification settings"""
@@ -1100,7 +1100,7 @@ async def update_notification_settings(
 @router.put("/integrations")
 async def update_integration_settings(
     settings_data: IntegrationSettingsUpdate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update integration settings"""
@@ -1131,7 +1131,7 @@ async def update_integration_settings(
 @router.put("/compliance")
 async def update_compliance_settings(
     settings_data: ComplianceSettingsUpdate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update compliance settings"""
@@ -1160,7 +1160,7 @@ async def update_compliance_settings(
 @router.put("/backup")
 async def update_backup_settings(
     settings_data: BackupSettingsUpdate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update backup settings"""
@@ -1189,7 +1189,7 @@ async def update_backup_settings(
 @router.put("/users", summary="Update User Roles Settings", description="Update user roles and permissions configuration for the pharmacy management system")
 async def update_user_roles_settings(
     settings_data: UserRolesSettingsUpdate,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update user roles settings"""
@@ -1210,7 +1210,7 @@ async def update_user_roles_settings(
 @router.get("/{category}", summary="Get Settings by Category", description="Retrieve settings for a specific category (organization, pos, theme, inventory, notifications, integrations, compliance, backup, or users)")
 async def get_settings(
     category: str,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get settings for a specific category"""
@@ -1883,7 +1883,7 @@ async def get_settings(
 async def update_settings(
     category: str,
     settings_data: dict,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update settings for a specific category"""
@@ -2209,7 +2209,7 @@ async def update_settings(
 
 @router.post("/backup/create", summary="Create Manual Backup", description="Create a manual backup of the pharmacy database with optional cloud storage")
 async def create_backup(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a manual backup"""
@@ -2341,7 +2341,7 @@ async def create_backup(
 
 @router.get("/backup/history", summary="Get Backup History", description="Retrieve the history of backup operations including automatic and manual backups")
 async def get_backup_history(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get backup history"""
@@ -2377,7 +2377,7 @@ async def get_backup_history(
 @router.post("/backup/{backup_id}/restore", summary="Restore from Backup", description="Restore the pharmacy database from a specified backup file")
 async def restore_backup(
     backup_id: str,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Restore from a backup"""
@@ -2446,7 +2446,7 @@ async def restore_backup(
 @router.post("/export", summary="Export Data", description="Export pharmacy data in the specified format (CSV, JSON, or XML) with customizable options")
 async def export_data(
     format: str,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Export data in the specified format"""
@@ -2623,7 +2623,7 @@ async def export_data(
 async def upload_document(
     file: UploadFile = File(...),
     license_type: Optional[str] = None,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Upload a document (e.g., license document)"""
@@ -2703,7 +2703,7 @@ async def upload_document(
 @router.post("/test-connection/{integration}")
 async def test_integration_connection(
     integration: str,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Test connection to an external integration"""
@@ -2873,7 +2873,7 @@ async def test_integration_connection(
 @router.post("/test-email")
 async def test_email_settings(
     email: str,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Test email settings by sending a test email"""
@@ -3000,7 +3000,7 @@ async def test_email_settings(
 @router.post("/test-sms")
 async def test_sms_settings(
     phone: str,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Test SMS settings by sending a test SMS"""
@@ -3093,7 +3093,7 @@ async def test_sms_settings(
 # User Management Endpoints
 @router.get("/users/list")
 async def get_users(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get all users"""
@@ -3117,7 +3117,7 @@ async def get_users(
 @router.post("/users/create")
 async def create_user(
     user_data: dict,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a new user"""
@@ -3188,7 +3188,7 @@ async def create_user(
 async def update_user(
     user_id: int,
     user_data: dict,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update an existing user"""
@@ -3261,7 +3261,7 @@ async def update_user(
 @router.delete("/users/{user_id}")
 async def delete_user(
     user_id: int,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Delete a user"""
@@ -3290,7 +3290,7 @@ async def delete_user(
 async def reset_user_password(
     user_id: int,
     password_data: PasswordReset,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Reset a user's password"""
@@ -3318,7 +3318,7 @@ async def reset_user_password(
 @router.post("/users/{user_id}/toggle-status", summary="Toggle User Status", description="Activate or deactivate a user account (prevents self-deactivation)")
 async def toggle_user_status(
     user_id: int,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Toggle a user's active status"""
