@@ -45,28 +45,28 @@ const Dashboard = () => {
       value: `$${statsData.total_sales_today?.toFixed(2) || '0.00'}`,
       icon: CurrencyDollarIcon,
       color: 'bg-green-500',
-      link: '/billing',
+      link: '/app/billing',
     },
     {
       name: 'Today\'s Orders',
       value: statsData.total_orders_today || 0,
       icon: DocumentTextIcon,
       color: 'bg-blue-500',
-      link: '/billing',
+      link: '/app/billing',
     },
     {
       name: 'Total Patients',
       value: statsData.total_patients || 0,
       icon: UsersIcon,
       color: 'bg-purple-500',
-      link: '/patients',
+      link: '/app/patients',
     },
     {
       name: 'Total Medicines',
       value: statsData.total_medicines || 0,
       icon: CubeIcon,
       color: 'bg-yellow-500',
-      link: '/inventory',
+      link: '/app/inventory',
     },
   ];
 
@@ -76,21 +76,21 @@ const Dashboard = () => {
       value: statsData.low_stock_alerts || 0,
       icon: ExclamationTriangleIcon,
       color: 'bg-orange-500',
-      link: '/inventory?alerts=low-stock',
+      link: '/app/inventory?alerts=low-stock',
     },
     {
       name: 'Expiring Soon',
       value: statsData.expiring_soon_alerts || 0,
       icon: ClockIcon,
       color: 'bg-red-500',
-      link: '/inventory?alerts=expiring',
+      link: '/app/inventory?alerts=expiring',
     },
     {
       name: 'Pending Prescriptions',
       value: statsData.pending_prescriptions || 0,
       icon: DocumentTextIcon,
       color: 'bg-yellow-500',
-      link: '/prescriptions?status=pending',
+      link: '/app/prescriptions?status=pending',
     },
   ];
 
@@ -240,25 +240,25 @@ const Dashboard = () => {
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <Link
-                to="/patients/create"
+                to="/app/patients/create"
                 className="inline-flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 Add Patient
               </Link>
               <Link
-                to="/prescriptions/create"
+                to="/app/prescriptions/create"
                 className="inline-flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 New Prescription
               </Link>
               <Link
-                to="/billing/create"
+                to="/app/billing/create"
                 className="inline-flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 Create Invoice
               </Link>
               <Link
-                to="/inventory/medicines/create"
+                to="/app/inventory/medicines/create"
                 className="inline-flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 Add Medicine

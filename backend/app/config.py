@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     TWILIO_AUTH_TOKEN: Optional[str] = None
     TWILIO_PHONE_NUMBER: Optional[str] = None
     
+    # SMS Configuration
+    SMS_ENABLED: bool = True
+    SMS_TEST_MODE: bool = True  # Set to False in production
+    SMS_FROM_NAME: str = "Pharmacy System"
+    
     # File upload
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB

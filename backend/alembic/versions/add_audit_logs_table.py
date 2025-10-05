@@ -1,6 +1,6 @@
 """add audit logs table
 
-Revision ID: 3c4d5e6f7g8h
+Revision ID: 5e6f7g8h9i0j
 Revises: 2b3c4d5e6f7g
 Create Date: 2025-10-04 16:37:00.000000
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '3c4d5e6f7g8h'
+revision = '5e6f7g8h9i0j'
 down_revision = '2b3c4d5e6f7g'
 branch_labels = None
 depends_on = None

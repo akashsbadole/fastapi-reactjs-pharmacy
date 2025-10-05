@@ -36,30 +36,59 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
+    print(f"Creating access token with data: {to_encode}")
+    print(f"Using secret key: {settings.SECRET_KEY[:10]}...")
+    print(f"Algorithm: {settings.ALGORITHM}")
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    print(f"Created access token: {encoded_jwt[:10]}...")
     return encoded_jwt
 
 def create_refresh_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
+    print(f"Creating refresh token with data: {to_encode}")
+    print(f"Using secret key: {settings.SECRET_KEY[:10]}...")
+    print(f"Algorithm: {settings.ALGORITHM}")
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    print(f"Created refresh token: {encoded_jwt[:10]}...")
     return encoded_jwt
 
 def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
+    # Check for placeholder tokens that shouldn't be validated
+    if token == "2FA_REQUIRED":
+        print("Received placeholder token '2FA_REQUIRED' instead of actual JWT")
+        return None
+        
+    if not token or "." not in token:
+        print("Invalid token format - token must contain at least one period")
+        return None
+        
     try:
+        print(f"Verifying token: {token[:10]}...")
+        print(f"Using secret key: {settings.SECRET_KEY[:10]}...")
+        print(f"Algorithm: {settings.ALGORITHM}")
+        
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")
         
+        print(f"Token payload: {payload}")
+        
         if token_type == "refresh" and payload.get("type") != "refresh":
+            print("Token type mismatch")
             return None
             
         if username is None:
+            print("No username in token")
             return None
             
         token_data = TokenData(username=username)
         return token_data
-    except JWTError:
+    except JWTError as e:
+        print(f"JWT error: {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error verifying token: {e}")
         return None
 
 def authenticate_user(db: Session, username: str, password: str) -> Union[bool, User]:
@@ -96,19 +125,36 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         headers={"WWW-Authenticate": "Bearer"},
     )
     
-    token = credentials.credentials
-    token_data = verify_token(token)
-    if token_data is None:
+    try:
+        token = credentials.credentials
+        
+        # Check for placeholder tokens
+        if token == "2FA_REQUIRED":
+            print("Received placeholder token '2FA_REQUIRED' in get_current_user")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Two-factor authentication required. Please complete 2FA verification.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            
+        token_data = verify_token(token)
+        if token_data is None:
+            raise credentials_exception
+            
+        user = db.query(User).filter(User.username == token_data.username).first()
+        if user is None:
+            raise credentials_exception
+            
+        if not user.is_active:
+            raise HTTPException(status_code=400, detail="Inactive user")
+            
+        return user
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        print(f"Authentication error: {e}")
         raise credentials_exception
-        
-    user = db.query(User).filter(User.username == token_data.username).first()
-    if user is None:
-        raise credentials_exception
-        
-    if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
-        
-    return user
 
 def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     if not current_user.is_active:

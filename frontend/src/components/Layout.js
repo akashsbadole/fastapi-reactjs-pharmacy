@@ -19,6 +19,7 @@ import {
   BellIcon,
   ShoppingCartIcon,
   UserCircleIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 
 const Layout = () => {
@@ -50,29 +51,30 @@ const Layout = () => {
   };
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-    { name: 'Point of Sale', href: '/pos', icon: ShoppingCartIcon },
-    { name: 'Patients', href: '/patients', icon: UsersIcon },
-    { name: 'Inventory', href: '/inventory', icon: CubeIcon },
-    { name: 'Prescriptions', href: '/prescriptions', icon: DocumentTextIcon },
-    { name: 'Billing', href: '/billing', icon: CreditCardIcon },
-    { name: 'Reports', href: '/reports', icon: ChartBarIcon },
-    { name: 'Audit Logs', href: '/audit', icon: ShieldCheckIcon },
-    { name: 'Subscription', href: '/subscription', icon: CurrencyDollarIcon },
-    { name: 'Help & Support', href: '/support', icon: QuestionMarkCircleIcon },
+    { name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon },
+    { name: 'Point of Sale', href: '/app/pos', icon: ShoppingCartIcon },
+    { name: 'Patients', href: '/app/patients', icon: UsersIcon },
+    { name: 'Inventory', href: '/app/inventory', icon: CubeIcon },
+    { name: 'Prescriptions', href: '/app/prescriptions', icon: DocumentTextIcon },
+    { name: 'Billing', href: '/app/billing', icon: CreditCardIcon },
+    { name: 'Reports', href: '/app/reports', icon: ChartBarIcon },
+    { name: 'AI Features', href: '/app/ai', icon: SparklesIcon },
+    { name: 'Audit Logs', href: '/app/audit', icon: ShieldCheckIcon },
+    { name: 'Subscription', href: '/app/subscription', icon: CurrencyDollarIcon },
+    { name: 'Help & Support', href: '/app/support', icon: QuestionMarkCircleIcon },
   ];
 
   // Add user management for admin users
   if (user?.role === 'admin') {
-    navigation.push({ name: 'Users', href: '/users', icon: CogIcon });
+    navigation.push({ name: 'Users', href: '/app/users', icon: CogIcon });
   }
   
   // Add Settings for all authenticated users
-  navigation.push({ name: 'Settings', href: '/settings', icon: CogIcon });
+  navigation.push({ name: 'Settings', href: '/app/settings', icon: CogIcon });
 
   const isActive = (href) => {
-    if (href === '/inventory') {
-      return location.pathname.startsWith('/inventory');
+    if (href === '/app/inventory') {
+      return location.pathname.startsWith('/app/inventory');
     }
     return location.pathname === href;
   };
@@ -220,7 +222,7 @@ const Layout = () => {
                   <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 focus:outline-none z-20">
                     <div className="py-1">
                       <Link
-                        to="/profile"
+                        to="/app/profile"
                         className="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         onClick={() => setProfileDropdownOpen(false)}
                       >

@@ -55,9 +55,6 @@ export const endpoints = {
     ME: '/api/auth/me',
     CHANGE_PASSWORD: '/api/auth/change-password',
     UPLOAD_PROFILE_IMAGE: '/api/auth/upload-profile-image',
-    SETUP_2FA: '/api/auth/setup-2fa',
-    VERIFY_2FA: '/api/auth/verify-2fa',
-    DISABLE_2FA: '/api/auth/disable-2fa',
     FORGOT_PASSWORD: '/api/auth/forgot-password',
     RESET_PASSWORD: '/api/auth/reset-password',
     USERS: '/api/auth/users',
@@ -65,6 +62,17 @@ export const endpoints = {
     DELETE_USER: (id) => `/api/auth/users/${id}`,
     TOGGLE_USER_STATUS: (id) => `/api/auth/users/${id}/toggle-status`,
     STAFF_LOGIN: '/api/auth/staff-login',
+  },
+  
+  // Payment endpoints
+  PAYMENTS: {
+    PLANS: '/api/payments/plans',
+    RAZORPAY_CREATE_ORDER: '/api/payments/razorpay/create-order',
+    RAZORPAY_VERIFY: '/api/payments/razorpay/verify',
+    PAYPAL_CREATE_ORDER: '/api/payments/paypal/create-order',
+    PAYPAL_VERIFY: '/api/payments/paypal/verify',
+    SUBSCRIPTION: '/api/payments/subscription',
+    CANCEL: '/api/payments/cancel',
   },
   
   // Patient endpoints

@@ -339,7 +339,7 @@ const InvoiceDetails = () => {
       <div className="mb-6 no-print">
         <div className="flex items-center">
           <Link
-            to="/billing"
+            to="/app/billing"
             className="flex items-center text-primary-600 hover:text-primary-900"
           >
             <ArrowLeftIcon className="h-5 w-5 mr-1" />
@@ -507,7 +507,7 @@ const InvoiceDetails = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium no-print">
                             <Link
-                              to={`/prescriptions/${prescription.id}`}
+                              to={`/app/prescriptions/${prescription.id}`}
                               className="text-primary-600 hover:text-primary-900"
                             >
                               View
@@ -584,7 +584,7 @@ const InvoiceDetails = () => {
                   </button>
                 )}
                 <Link
-                  to={`/patients/${invoice.patient_id}`}
+                  to={`/app/patients/${invoice.patient_id}`}
                   className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   View Patient

@@ -38,7 +38,7 @@ const BatchCreate = () => {
     {
       enabled: !!medicine_id,
       onError: () => {
-        navigate('/inventory/medicines');
+        navigate('/app/inventory/medicines');
       }
     }
   );
@@ -70,7 +70,7 @@ const BatchCreate = () => {
         
         // Redirect after a short delay
         setTimeout(() => {
-          navigate(medicine_id ? `/inventory/medicines/${medicine_id}` : '/inventory?tab=batches');
+          navigate(medicine_id ? `/app/inventory/medicines/${medicine_id}` : '/app/inventory?tab=batches');
         }, 2000);
       },
       onError: (error) => {
@@ -203,7 +203,7 @@ const BatchCreate = () => {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900">Medicine not found</h2>
           <Link
-            to="/inventory/medicines"
+            to="/app/inventory/medicines"
             className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
           >
             Back to Medicines
@@ -217,7 +217,7 @@ const BatchCreate = () => {
     <div className="px-4 py-6 sm:px-6 lg:px-8">
       <div className="mb-6">
         <Link
-          to={medicine_id ? `/inventory/medicines/${medicine_id}` : "/inventory/medicines"}
+          to={medicine_id ? `/app/inventory/medicines/${medicine_id}` : "/app/inventory/medicines"}
           className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-500"
         >
           <ArrowLeftIcon className="-ml-1 mr-1 h-5 w-5" aria-hidden="true" />
@@ -519,7 +519,7 @@ const BatchCreate = () => {
         <div className="flex justify-end">
           <button
             type="button"
-            onClick={() => navigate(medicine_id ? `/inventory/medicines/${medicine_id}` : '/inventory/medicines')}
+            onClick={() => navigate(medicine_id ? `/app/inventory/medicines/${medicine_id}` : '/app/inventory/medicines')}
             className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             Cancel

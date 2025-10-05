@@ -19,7 +19,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   // Check if user has required role (if specified)
   if (requiredRole && user?.role !== requiredRole) {
     // Redirect to dashboard with access denied message
-    return <Navigate to="/dashboard" state={{ accessDenied: true }} replace />;
+    return <Navigate to="/app/dashboard" state={{ accessDenied: true }} replace />;
   }
 
   return children;

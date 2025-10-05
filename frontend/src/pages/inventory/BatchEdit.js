@@ -49,7 +49,7 @@ const BatchEdit = () => {
         });
       },
       onError: () => {
-        navigate('/inventory?tab=batches');
+        navigate('/app/inventory?tab=batches');
       }
     }
   );
@@ -71,7 +71,7 @@ const BatchEdit = () => {
         
         // Redirect after a short delay
         setTimeout(() => {
-          navigate(`/inventory/batches/${id}`);
+          navigate(`/app/inventory/batches/${id}`);
         }, 2000);
       },
       onError: (error) => {
@@ -171,7 +171,7 @@ const BatchEdit = () => {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900">Batch not found</h2>
           <Link
-            to="/inventory?tab=batches"
+            to="/app/inventory?tab=batches"
             className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
           >
             Back to Batches
@@ -185,7 +185,7 @@ const BatchEdit = () => {
     <div className="px-4 py-6 sm:px-6 lg:px-8">
       <div className="mb-6">
         <Link
-          to={`/inventory/batches/${id}`}
+          to={`/app/inventory/batches/${id}`}
           className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-500"
         >
           <ArrowLeftIcon className="-ml-1 mr-1 h-5 w-5" aria-hidden="true" />
@@ -442,7 +442,7 @@ const BatchEdit = () => {
         <div className="flex justify-end">
           <button
             type="button"
-            onClick={() => navigate(`/inventory/batches/${id}`)}
+            onClick={() => navigate(`/app/inventory/batches/${id}`)}
             className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             Cancel

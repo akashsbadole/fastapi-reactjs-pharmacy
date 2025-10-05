@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 import uvicorn
 
 from app.database import get_db
-from app.routers import auth, inventory, prescriptions, patients, billing, reports, pos, audit, support, subscription
+from app.routers import auth, inventory, prescriptions, patients, billing, reports, pos, audit, support, subscription, notifications, sms, ai, payments
 from app.routers.settings import router as settings_router
 from app.config import settings
 
@@ -36,6 +36,10 @@ app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(support.router, prefix="/api/support", tags=["support"])
 app.include_router(subscription.router, prefix="/api/subscription", tags=["subscription"])
+app.include_router(notifications.router, prefix="/api", tags=["notifications"])
+app.include_router(sms.router, prefix="/api/sms", tags=["sms"])
+app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
+app.include_router(payments.router, prefix="/api/payments", tags=["payments"])
 app.include_router(settings_router, prefix="/api", tags=["settings"])
 
 @app.get("/")

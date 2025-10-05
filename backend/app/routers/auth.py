@@ -1,27 +1,35 @@
-from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from fastapi.security import HTTPBearer
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from datetime import timedelta, datetime
 from typing import List
 import os
 import uuid
 import secrets
-import pyotp
-from datetime import datetime
+
+try:
+    from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+    from fastapi.security import HTTPBearer
+except ImportError:
+    print("FastAPI import error - please ensure FastAPI is installed")
+    raise
+
+
+from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from ..database import get_db
 from ..models import User, AuditLog
 from ..schemas.auth import (
     User as UserSchema, UserCreate, UserUpdate, LoginRequest, Token, RefreshTokenRequest,
     PasswordChange, StaffLoginRequest, StaffLoginResponse, ProfileImageUpload,
-    TwoFactorSetup, TwoFactorVerify, ForgotPassword, ResetPassword
+    ForgotPassword, ResetPassword,
+    OTPLoginRequest, OTPLoginResponse, SendOTPRequest, VerifyOTPRequest
 )
 from ..utils.auth import (
     authenticate_user, authenticate_staff, create_access_token, create_refresh_token, verify_token,
     get_password_hash, get_current_active_user, require_admin
 )
 from ..config import settings
+from ..services.notification_service import EmailNotificationService
+from ..services.sms_service import SMSNotificationService
 
 router = APIRouter()
 security = HTTPBearer()
@@ -86,6 +94,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
+        # Proceed with normal login
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data={"sub": user.username}, expires_delta=access_token_expires
@@ -479,96 +488,6 @@ async def upload_profile_image(
     
     return current_user
 
-# Two-Factor Authentication endpoints
-@router.post("/setup-2fa")
-async def setup_two_factor(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    # Generate secret key
-    secret = pyotp.random_base32()
-    
-    # Store secret temporarily (not enabled yet)
-    current_user.two_factor_secret = secret
-    db.commit()
-    
-    # Generate provisioning URI
-    provisioning_uri = pyotp.totp.TOTP(secret).provisioning_uri(
-        name=current_user.email,
-        issuer_name="Pharmacy Management System"
-    )
-    
-    return {
-        "secret": secret,
-        "provisioning_uri": provisioning_uri,
-        " qr_code": provisioning_uri  # In a real implementation, you would generate a QR code image
-    }
-
-@router.post("/verify-2fa")
-async def verify_two_factor(
-    verification_data: TwoFactorVerify,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    if not current_user.two_factor_secret:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="2FA not set up"
-        )
-    
-    # Verify the code
-    totp = pyotp.TOTP(current_user.two_factor_secret)
-    if not totp.verify(verification_data.code):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid verification code"
-        )
-    
-    # Enable 2FA
-    current_user.two_factor_enabled = True
-    db.commit()
-    
-    # Create audit log
-    audit_log = AuditLog(
-        user_id=current_user.id,
-        action="UPDATE",
-        resource_type="USER",
-        resource_id=current_user.id,
-        new_values=f"2FA enabled for user {current_user.username}"
-    )
-    db.add(audit_log)
-    db.commit()
-    
-    return {"message": "Two-factor authentication enabled successfully"}
-
-@router.post("/disable-2fa")
-async def disable_two_factor(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    if not current_user.two_factor_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="2FA not enabled"
-        )
-    
-    # Disable 2FA
-    current_user.two_factor_enabled = False
-    current_user.two_factor_secret = None
-    db.commit()
-    
-    # Create audit log
-    audit_log = AuditLog(
-        user_id=current_user.id,
-        action="UPDATE",
-        resource_type="USER",
-        resource_id=current_user.id,
-        new_values=f"2FA disabled for user {current_user.username}"
-    )
-    db.add(audit_log)
-    db.commit()
-    
-    return {"message": "Two-factor authentication disabled successfully"}
 
 # Forgot password endpoints
 @router.post("/forgot-password")
@@ -586,8 +505,14 @@ async def forgot_password(
     reset_token = secrets.token_urlsafe(32)
     expiry_time = datetime.utcnow() + timedelta(hours=1)  # Token valid for 1 hour
     
-    # In a real implementation, you would store this token in the database or a cache
-    # For now, we'll just return a success message
+    # Store reset token in database
+    user.reset_token = reset_token
+    user.reset_token_expires_at = expiry_time
+    db.commit()
+    
+    # Send email with reset link
+    email_service = EmailNotificationService(db)
+    email_result = email_service.send_password_reset_email(user, reset_token)
     
     # Create audit log
     audit_log = AuditLog(
@@ -600,25 +525,314 @@ async def forgot_password(
     db.add(audit_log)
     db.commit()
     
-    return {"message": "If your email is registered, you will receive a password reset link"}
+    return {
+        "message": "If your email is registered, you will receive a password reset link",
+        "email_sent": email_result.get("success", False),
+        "email_message": email_result.get("message", ""),
+        "reset_token": reset_token if not email_result.get("success", False) else None  # Only return token if email failed
+    }
 
 @router.post("/reset-password")
 async def reset_password(
     request_data: ResetPassword,
     db: Session = Depends(get_db)
 ):
-    # In a real implementation, you would validate the token against the database or cache
-    # For now, we'll just return a success message
+    # Find user by email
+    user = db.query(User).filter(User.email == request_data.email).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Validate reset token
+    if not user.reset_token or user.reset_token != request_data.token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    # Check if token has expired
+    if datetime.utcnow() > user.reset_token_expires_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired"
+        )
+    
+    # Update password
+    user.hashed_password = get_password_hash(request_data.new_password)
+    
+    # Clear reset token
+    user.reset_token = None
+    user.reset_token_expires_at = None
+    db.commit()
     
     # Create audit log
     audit_log = AuditLog(
-        user_id=0,  # Unknown user at this point
+        user_id=user.id,
         action="PASSWORD_RESET",
         resource_type="USER",
-        resource_id=0,
-        new_values="Password reset completed"
+        resource_id=user.id,
+        new_values=f"Password reset completed for user {user.username}"
     )
     db.add(audit_log)
     db.commit()
     
     return {"message": "Password reset successfully"}
+
+# OTP Login endpoints
+@router.post("/send-otp", response_model=dict)
+async def send_otp(
+    request_data: SendOTPRequest,
+    db: Session = Depends(get_db)
+):
+    """Send OTP to user for login"""
+    user = authenticate_user(db, request_data.username, request_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password"
+        )
+    
+    # Generate OTP
+    otp_code = f"{secrets.randbelow(1000000):06d}"  # 6-digit OTP
+    otp_secret = pyotp.random_base32()
+    
+    # Store OTP in database
+    user.otp_code = otp_code
+    user.otp_secret = otp_secret
+    user.otp_expires_at = datetime.utcnow() + timedelta(minutes=5)  # OTP valid for 5 minutes
+    db.commit()
+    
+    # Send OTP via email
+    email_service = EmailNotificationService(db)
+    email_result = email_service.send_otp_email(user, otp_code)
+    
+    # Send OTP via SMS if user has a phone number
+    sms_result = {"success": False, "message": "No phone number provided"}
+    if user.phone:
+        sms_service = SMSNotificationService(db)
+        sms_result = sms_service.send_otp_sms(user, otp_code)
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user_id=user.id,
+        action="OTP_SENT",
+        resource_type="USER",
+        resource_id=user.id,
+        new_values=f"OTP sent to user {user.username} via email and SMS"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    return {
+        "message": "OTP sent successfully",
+        "email_sent": email_result.get("success", False),
+        "email_message": email_result.get("message", ""),
+        "sms_sent": sms_result.get("success", False),
+        "sms_message": sms_result.get("message", ""),
+        "otp_code": otp_code if not email_result.get("success", False) and not sms_result.get("success", False) else None,  # Only return OTP if both failed
+        "expires_at": user.otp_expires_at.isoformat() if user.otp_expires_at else None
+    }
+
+@router.post("/verify-otp", response_model=Token)
+async def verify_otp(
+    request_data: VerifyOTPRequest,
+    db: Session = Depends(get_db)
+):
+    """Verify OTP and complete login"""
+    user = db.query(User).filter(User.username == request_data.username).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+    
+    # Check if OTP is valid
+    if not user.otp_code or not user.otp_expires_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No OTP request found"
+        )
+    
+    # Check if OTP has expired
+    if datetime.utcnow() > user.otp_expires_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OTP has expired"
+        )
+    
+    # Verify OTP
+    if user.otp_code != request_data.otp_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid OTP"
+        )
+    
+    # Clear OTP after successful verification
+    user.otp_code = None
+    user.otp_expires_at = None
+    db.commit()
+    
+    # Generate tokens
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    refresh_token = create_refresh_token(data={"sub": user.username})
+    
+    # Update last login
+    user.last_login = func.now()
+    db.commit()
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user_id=user.id,
+        action="LOGIN_OTP",
+        resource_type="USER",
+        resource_id=user.id,
+        new_values=f"User {user.username} logged in with OTP"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
+
+@router.post("/login-otp", response_model=OTPLoginResponse)
+async def login_with_otp(
+    login_data: OTPLoginRequest,
+    db: Session = Depends(get_db)
+):
+    """Login with optional OTP verification"""
+    try:
+        user = authenticate_user(db, login_data.username, login_data.password)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Check if user has OTP enabled
+        if user.otp_enabled:
+            # If OTP is enabled but no code provided, return that OTP is required
+            if not login_data.otp_code:
+                return {
+                    "requires_otp": True,
+                    "user": None
+                }
+            
+            # Verify OTP code
+            if not user.otp_secret:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="OTP not set up for this user"
+                )
+            
+            totp = pyotp.TOTP(user.otp_secret)
+            if not totp.verify(login_data.otp_code):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid OTP code"
+                )
+        
+        # Generate tokens
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.username}, expires_delta=access_token_expires
+        )
+        refresh_token = create_refresh_token(data={"sub": user.username})
+        
+        # Update last login
+        user.last_login = func.now()
+        db.commit()
+        
+        # Create audit log
+        try:
+            audit_log = AuditLog(
+                user_id=user.id,
+                action="LOGIN_OTP",
+                resource_type="USER",
+                resource_id=user.id,
+                new_values=f"User {user.username} logged in with OTP"
+            )
+            db.add(audit_log)
+            db.commit()
+        except Exception as e:
+            print(f"Error creating audit log: {e}")
+            # Continue without audit log
+            pass
+        
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "requires_otp": False,
+            "user": user
+        }
+    except Exception as e:
+        print(f"OTP login error: {e}")
+        raise
+
+@router.post("/setup-otp")
+async def setup_otp(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Setup OTP for user"""
+    # Generate secret key
+    secret = pyotp.random_base32()
+    
+    # Store secret
+    current_user.otp_secret = secret
+    current_user.otp_enabled = True
+    db.commit()
+    
+    # Generate provisioning URI
+    provisioning_uri = pyotp.totp.TOTP(secret).provisioning_uri(
+        name=current_user.email,
+        issuer_name="Pharmacy Management System"
+    )
+    
+    return {
+        "secret": secret,
+        "provisioning_uri": provisioning_uri,
+        "qr_code": provisioning_uri  # In a real implementation, you would generate a QR code image
+    }
+
+@router.post("/disable-otp")
+async def disable_otp(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Disable OTP for user"""
+    if not current_user.otp_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OTP not enabled"
+        )
+    
+    # Disable OTP
+    current_user.otp_enabled = False
+    current_user.otp_secret = None
+    current_user.otp_code = None
+    current_user.otp_expires_at = None
+    db.commit()
+    
+    # Create audit log
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        action="UPDATE",
+        resource_type="USER",
+        resource_id=current_user.id,
+        new_values=f"OTP disabled for user {current_user.username}"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    return {"message": "OTP disabled successfully"}

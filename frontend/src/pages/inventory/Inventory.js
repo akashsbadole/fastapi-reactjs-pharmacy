@@ -100,9 +100,9 @@ const Inventory = () => {
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
           {activeTab !== 'analytics' && (
             <Link
-              to={activeTab === 'medicines' ? '/inventory/medicines/create' :
-                   activeTab === 'batches' ? '/inventory/batches/create' :
-                   activeTab === 'suppliers' ? '/inventory/suppliers/create' : '#'}
+              to={activeTab === 'medicines' ? '/app/inventory/medicines/create' :
+                   activeTab === 'batches' ? '/app/inventory/batches/create' :
+                   activeTab === 'suppliers' ? '/app/inventory/suppliers/create' : '#'}
               className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
             >
               <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
@@ -169,7 +169,7 @@ const Inventory = () => {
                   {filteredMedicines.map((medicine) => (
                     <li key={medicine.id}>
                       <Link
-                        to={`/inventory/medicines/${medicine.id}`}
+                        to={`/app/inventory/medicines/${medicine.id}`}
                         className="block hover:bg-gray-50"
                       >
                         <div className="px-4 py-4 sm:px-6">
@@ -222,7 +222,7 @@ const Inventory = () => {
                   {filteredBatches.map((batch) => (
                     <li key={batch.id}>
                       <Link
-                        to={`/inventory/batches/${batch.id}`}
+                        to={`/app/inventory/batches/${batch.id}`}
                         className="block hover:bg-gray-50"
                       >
                         <div className="px-4 py-4 sm:px-6">
@@ -278,7 +278,7 @@ const Inventory = () => {
                   {filteredSuppliers.map((supplier) => (
                     <li key={supplier.id}>
                       <Link
-                        to={`/inventory/suppliers/${supplier.id}`}
+                        to={`/app/inventory/suppliers/${supplier.id}`}
                         className="block hover:bg-gray-50"
                       >
                         <div className="px-4 py-4 sm:px-6">
@@ -332,7 +332,7 @@ const Inventory = () => {
                 </p>
                 <div className="mt-6">
                   <Link
-                    to="/inventory/analytics"
+                    to="/app/inventory/analytics"
                     className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                   >
                     View Analytics

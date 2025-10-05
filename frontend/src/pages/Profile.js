@@ -32,13 +32,6 @@ const Profile = () => {
     new_password: '',
     confirm_password: '',
   });
-  const [twoFactorSetup, setTwoFactorSetup] = useState({
-    secret: '',
-    provisioning_uri: '',
-    qr_code: '',
-    verification_code: '',
-  });
-  const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
 
   const { data: user, isLoading } = useQuery(
     'user-profile',
@@ -71,56 +64,6 @@ const Profile = () => {
     }
   );
 
-  // Setup 2FA mutation
-  const setupTwoFactor = useMutation(
-    () => api.post(endpoints.AUTH.SETUP_2FA),
-    {
-      onSuccess: (response) => {
-        setTwoFactorSetup({
-          secret: response.data.secret,
-          provisioning_uri: response.data.provisioning_uri,
-          qr_code: response.data.qr_code,
-          verification_code: '',
-        });
-        setShowTwoFactorSetup(true);
-        toast.success('Two-factor authentication setup initiated');
-      },
-      onError: (error) => {
-        toast.error(error.response?.data?.detail || 'Failed to setup 2FA');
-      },
-    }
-  );
-
-  // Verify 2FA mutation
-  const verifyTwoFactor = useMutation(
-    (code) => api.post(endpoints.AUTH.VERIFY_2FA, { code }),
-    {
-      onSuccess: () => {
-        setShowTwoFactorSetup(false);
-        toast.success('Two-factor authentication enabled successfully');
-        // Refresh user data
-        queryClient.invalidateQueries('user-profile');
-      },
-      onError: (error) => {
-        toast.error(error.response?.data?.detail || 'Invalid verification code');
-      },
-    }
-  );
-
-  // Disable 2FA mutation
-  const disableTwoFactor = useMutation(
-    () => api.post(endpoints.AUTH.DISABLE_2FA),
-    {
-      onSuccess: () => {
-        toast.success('Two-factor authentication disabled successfully');
-        // Refresh user data
-        queryClient.invalidateQueries('user-profile');
-      },
-      onError: (error) => {
-        toast.error(error.response?.data?.detail || 'Failed to disable 2FA');
-      },
-    }
-  );
 
   // Change password mutation
   const changePassword = useMutation(
@@ -184,18 +127,6 @@ const Profile = () => {
     changePassword.mutate(passwordData);
   };
 
-  const handleSetupTwoFactor = () => {
-    setupTwoFactor.mutate();
-  };
-
-  const handleVerifyTwoFactor = (e) => {
-    e.preventDefault();
-    verifyTwoFactor.mutate(twoFactorSetup.verification_code);
-  };
-
-  const handleDisableTwoFactor = () => {
-    disableTwoFactor.mutate();
-  };
 
   if (isLoading) {
     return <Loader text="Loading profile..." />;
@@ -468,96 +399,6 @@ const Profile = () => {
                   </form>
                 </div>
 
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900">Two-Factor Authentication</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Add an extra layer of security to your account.
-                  </p>
-                  <div className="mt-4">
-                    {showTwoFactorSetup ? (
-                      <div className="bg-gray-50 p-4 rounded-md">
-                        <div className="flex justify-between items-center mb-4">
-                          <h4 className="text-md font-medium text-gray-900">Setup Two-Factor Authentication</h4>
-                          <button
-                            onClick={() => setShowTwoFactorSetup(false)}
-                            className="text-gray-400 hover:text-gray-500"
-                          >
-                            <XMarkIcon className="h-5 w-5" />
-                          </button>
-                        </div>
-                        <div className="space-y-4">
-                          <div>
-                            <p className="text-sm text-gray-600 mb-2">
-                              Scan the QR code below with your authenticator app:
-                            </p>
-                            <div className="bg-white p-2 rounded-md flex justify-center">
-                              <div className="h-40 w-40 bg-gray-200 flex items-center justify-center">
-                                <span className="text-xs text-gray-500">QR Code Placeholder</span>
-                              </div>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-2 text-center">
-                              Or enter this code manually: {twoFactorSetup.secret}
-                            </p>
-                          </div>
-                          <div>
-                            <label htmlFor="verification_code" className="block text-sm font-medium text-gray-700">
-                              Verification Code
-                            </label>
-                            <input
-                              type="text"
-                              id="verification_code"
-                              value={twoFactorSetup.verification_code}
-                              onChange={(e) => setTwoFactorSetup({...twoFactorSetup, verification_code: e.target.value})}
-                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                              placeholder="Enter 6-digit code"
-                            />
-                          </div>
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={handleVerifyTwoFactor}
-                              disabled={verifyTwoFactor.isLoading}
-                              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
-                            >
-                              {verifyTwoFactor.isLoading ? 'Verifying...' : 'Verify & Enable'}
-                            </button>
-                            <button
-                              onClick={() => setShowTwoFactorSetup(false)}
-                              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <ShieldCheckIcon className="h-5 w-5 text-gray-400" />
-                          <span className="ml-2 text-sm text-gray-900">
-                            Two-Factor Authentication {user.two_factor_enabled ? 'Enabled' : 'Disabled'}
-                          </span>
-                        </div>
-                        {user.two_factor_enabled ? (
-                          <button
-                            onClick={handleDisableTwoFactor}
-                            disabled={disableTwoFactor.isLoading}
-                            className="text-sm font-medium text-red-600 hover:text-red-500 disabled:opacity-50"
-                          >
-                            {disableTwoFactor.isLoading ? 'Disabling...' : 'Disable'}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={handleSetupTwoFactor}
-                            disabled={setupTwoFactor.isLoading}
-                            className="text-sm font-medium text-primary-600 hover:text-primary-500 disabled:opacity-50"
-                          >
-                            {setupTwoFactor.isLoading ? 'Setting up...' : 'Enable'}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
           </div>

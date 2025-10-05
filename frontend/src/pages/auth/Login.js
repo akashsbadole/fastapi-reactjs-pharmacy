@@ -18,7 +18,7 @@ const Login = () => {
     formState: { errors },
   } = useForm();
 
-  const from = location.state?.from?.pathname || '/dashboard';
+  const from = location.state?.from?.pathname || '/app/dashboard';
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -30,8 +30,8 @@ const Login = () => {
     setIsSubmitting(true);
     
     try {
-      const success = await login(data);
-      if (success) {
+      const result = await login(data);
+      if (result === true) {
         navigate(from, { replace: true });
       }
     } catch (error) {
@@ -126,9 +126,9 @@ const Login = () => {
             </div>
 
             <div className="text-sm">
-              <a href="#" className="font-medium text-primary-600 hover:text-primary-500">
+              <Link to="/forgot-password" className="font-medium text-primary-600 hover:text-primary-500">
                 Forgot your password?
-              </a>
+              </Link>
             </div>
           </div>
 

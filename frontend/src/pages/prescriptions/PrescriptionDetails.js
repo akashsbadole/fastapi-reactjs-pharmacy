@@ -95,7 +95,7 @@ const PrescriptionDetails = () => {
       <div className="mb-6">
         <div className="flex items-center">
           <Link
-            to="/prescriptions"
+            to="/app/prescriptions"
             className="flex items-center text-primary-600 hover:text-primary-900"
           >
             <ArrowLeftIcon className="h-5 w-5 mr-1" />
@@ -194,7 +194,7 @@ const PrescriptionDetails = () => {
                 {prescription.status === 'PENDING' && (
                   <>
                     <Link
-                      to={`/prescriptions/${id}/edit`}
+                      to={`/app/prescriptions/${id}/edit`}
                       className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                     >
                       Edit Prescription
@@ -214,7 +214,7 @@ const PrescriptionDetails = () => {
                   </button>
                 )}
                 <Link
-                  to={`/patients/${prescription.patient_id}`}
+                  to={`/app/patients/${prescription.patient_id}`}
                   className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   View Patient

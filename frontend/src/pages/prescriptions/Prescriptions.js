@@ -89,7 +89,7 @@ const Prescriptions = () => {
         </div>
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
           <Link
-            to="/prescriptions/create"
+            to="/app/prescriptions/create"
             className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
           >
             <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
@@ -218,14 +218,14 @@ const Prescriptions = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end space-x-2">
                             <Link
-                              to={`/prescriptions/${prescription.id}`}
+                              to={`/app/prescriptions/${prescription.id}`}
                               className="text-primary-600 hover:text-primary-900"
                             >
                               View
                             </Link>
                             {prescription.status === 'PENDING' && (
                               <Link
-                                to={`/prescriptions/${prescription.id}/edit`}
+                                to={`/app/prescriptions/${prescription.id}/edit`}
                                 className="text-primary-600 hover:text-primary-900"
                               >
                                 Edit

@@ -106,7 +106,7 @@ const MedicineEdit = () => {
 
       await authAPI.put(endpoints.INVENTORY.MEDICINE(id), submitData);
       queryClient.invalidateQueries('medicines');
-      navigate(`/inventory/medicines/${id}`);
+      navigate(`/app/inventory/medicines/${id}`);
     } catch (error) {
       console.error('Error updating medicine:', error);
       alert('Failed to update medicine. Please try again.');
@@ -123,7 +123,7 @@ const MedicineEdit = () => {
     <div className="px-4 py-6 sm:px-6 lg:px-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <Link to={`/inventory/medicines/${id}`} className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700">
+          <Link to={`/app/inventory/medicines/${id}`} className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700">
             <ArrowLeftIcon className="h-4 w-4 mr-1" />
             Back to Medicine Details
           </Link>
@@ -566,7 +566,7 @@ const MedicineEdit = () => {
         <div className="flex justify-end">
           <button
             type="button"
-            onClick={() => navigate(`/inventory/medicines/${id}`)}
+            onClick={() => navigate(`/app/inventory/medicines/${id}`)}
             className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             Cancel

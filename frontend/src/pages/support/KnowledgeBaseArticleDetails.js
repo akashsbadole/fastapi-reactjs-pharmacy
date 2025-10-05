@@ -74,7 +74,7 @@ const KnowledgeBaseArticleDetails = () => {
     <div className="container mx-auto px-4 py-6">
       <div className="mb-6">
         <button
-          onClick={() => navigate('/support')}
+          onClick={() => navigate('/app/support')}
           className="flex items-center text-sm text-gray-500 hover:text-gray-700"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
@@ -169,8 +169,8 @@ const KnowledgeBaseArticleDetails = () => {
                 <div className="divide-y divide-gray-200">
                   {relatedArticles.map((relatedArticle) => (
                     <div key={relatedArticle.id} className="px-4 py-4 hover:bg-gray-50">
-                      <Link 
-                        to={`/support/knowledge-base/${relatedArticle.id}`}
+                      <Link
+                        to={`/app/support/knowledge-base/${relatedArticle.id}`}
                         className="block"
                       >
                         <h4 className="text-sm font-medium text-primary-600 hover:text-primary-800">
@@ -197,13 +197,13 @@ const KnowledgeBaseArticleDetails = () => {
                 </p>
                 <div className="space-y-3">
                   <Link
-                    to="/support/tickets"
+                    to="/app/support/tickets"
                     className="block w-full text-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
                   >
                     Create Support Ticket
                   </Link>
                   <button
-                    onClick={() => navigate('/support')}
+                    onClick={() => navigate('/app/support')}
                     className="block w-full text-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                   >
                     Browse All Articles

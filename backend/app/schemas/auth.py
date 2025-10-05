@@ -1,4 +1,7 @@
-from pydantic import BaseModel, EmailStr
+try:
+    from pydantic import BaseModel, EmailStr
+except ImportError:
+    from pydantic.v1 import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
 from ..models import UserRole
@@ -25,7 +28,6 @@ class User(UserBase):
     id: int
     is_active: bool
     profile_image: Optional[str] = None
-    two_factor_enabled: bool = False
     created_at: datetime
     updated_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
@@ -64,16 +66,31 @@ class StaffLoginResponse(BaseModel):
 class ProfileImageUpload(BaseModel):
     profile_image: str
 
-class TwoFactorSetup(BaseModel):
-    two_factor_enabled: bool
-    two_factor_secret: Optional[str] = None
-
-class TwoFactorVerify(BaseModel):
-    code: str
 
 class ForgotPassword(BaseModel):
     email: str
 
 class ResetPassword(BaseModel):
+    email: str
     token: str
     new_password: str
+
+class OTPLoginRequest(BaseModel):
+    username: str
+    password: str
+    otp_code: Optional[str] = None
+
+class OTPLoginResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    requires_otp: bool = False
+    user: Optional[User] = None
+
+class SendOTPRequest(BaseModel):
+    username: str
+    password: str
+
+class VerifyOTPRequest(BaseModel):
+    username: str
+    otp_code: str

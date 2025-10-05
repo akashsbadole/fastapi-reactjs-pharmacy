@@ -104,8 +104,8 @@ const HelpSupport = () => {
             <h3 className="ml-3 text-lg font-medium text-gray-900">Support Tickets</h3>
           </div>
           <p className="text-gray-600 mb-4">Can't find what you're looking for? Submit a support ticket.</p>
-          <Link 
-            to="/support/tickets"
+          <Link
+            to="/app/support/tickets"
             className="text-green-600 hover:text-green-800 font-medium flex items-center"
           >
             Create Ticket <ArrowRightIcon className="h-4 w-4 ml-1" />
@@ -211,8 +211,8 @@ const HelpSupport = () => {
                     </div>
                     <h3 className="text-lg font-medium text-gray-900 mb-2">{article.title}</h3>
                     <p className="text-gray-600 mb-4">{truncateText(article.content)}</p>
-                    <Link 
-                      to={`/support/knowledge-base/${article.id}`}
+                    <Link
+                      to={`/app/support/knowledge-base/${article.id}`}
                       className="text-primary-600 hover:text-primary-800 font-medium text-sm"
                     >
                       Read more

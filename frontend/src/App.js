@@ -7,9 +7,32 @@ import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
+import PublicLayout from './components/PublicLayout';
 
 // Pages
+import Landing from './pages/Landing';
 import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
+
+// Info Pages
+import Features from './pages/info/Features';
+import Pricing from './pages/info/Pricing';
+import API from './pages/info/API';
+import Documentation from './pages/info/Documentation';
+import About from './pages/info/About';
+import Blog from './pages/info/Blog';
+import Careers from './pages/info/Careers';
+import Press from './pages/info/Press';
+import HelpCenter from './pages/info/HelpCenter';
+import Contact from './pages/info/Contact';
+import Status from './pages/info/Status';
+import TermsOfService from './pages/info/TermsOfService';
+import Privacy from './pages/info/Privacy';
+import License from './pages/info/License';
+import Terms from './pages/info/Terms';
+import CookiePolicy from './pages/info/CookiePolicy';
 import Dashboard from './pages/Dashboard';
 import Patients from './pages/patients/Patients';
 import PatientCreate from './pages/patients/PatientCreate';
@@ -43,13 +66,15 @@ import AuditLogDetails from './pages/audit/AuditLogDetails';
 import HelpSupport from './pages/support/HelpSupport';
 import SupportTickets from './pages/support/SupportTickets';
 import KnowledgeBaseArticleDetails from './pages/support/KnowledgeBaseArticleDetails';
-import Subscription from './pages/subscription/Subscription';
+import SubscriptionPage from './pages/subscription/Subscription';
+import Subscription from './pages/Subscription';
 import Users from './pages/users/Users';
 import CreateUser from './pages/users/CreateUser';
 import UserDetails from './pages/users/UserDetails';
 import EditUser from './pages/users/EditUser';
 import Profile from './pages/Profile';
 import Settings from './pages/settings/Settings';
+import AIFeatures from './pages/ai/AIFeatures';
 import NotFound from './pages/NotFound';
 
 // Create a client for React Query
@@ -70,18 +95,39 @@ function App() {
           <Router future={{ v7_relativeSplatPath: true }}>
           <div className="App">
             <Routes>
-              {/* Public routes */}
-              <Route path="/login" element={<Login />} />
+              {/* Public routes with PublicLayout */}
+              <Route path="/" element={<PublicLayout><Landing /></PublicLayout>} />
+              <Route path="/login" element={<PublicLayout><Login /></PublicLayout>} />
+              <Route path="/register" element={<PublicLayout><Register /></PublicLayout>} />
+              <Route path="/forgot-password" element={<PublicLayout><ForgotPassword /></PublicLayout>} />
+              <Route path="/reset-password" element={<PublicLayout><ResetPassword /></PublicLayout>} />
+              
+              {/* Info Pages with PublicLayout */}
+              <Route path="/features" element={<PublicLayout><Features /></PublicLayout>} />
+              <Route path="/pricing" element={<PublicLayout><Pricing /></PublicLayout>} />
+              <Route path="/api" element={<PublicLayout><API /></PublicLayout>} />
+              <Route path="/documentation" element={<PublicLayout><Documentation /></PublicLayout>} />
+              <Route path="/about" element={<PublicLayout><About /></PublicLayout>} />
+              <Route path="/blog" element={<PublicLayout><Blog /></PublicLayout>} />
+              <Route path="/careers" element={<PublicLayout><Careers /></PublicLayout>} />
+              <Route path="/press" element={<PublicLayout><Press /></PublicLayout>} />
+              <Route path="/help-center" element={<PublicLayout><HelpCenter /></PublicLayout>} />
+              <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
+              <Route path="/status" element={<PublicLayout><Status /></PublicLayout>} />
+              <Route path="/terms-of-service" element={<PublicLayout><TermsOfService /></PublicLayout>} />
+              <Route path="/privacy" element={<PublicLayout><Privacy /></PublicLayout>} />
+              <Route path="/license" element={<PublicLayout><License /></PublicLayout>} />
+              <Route path="/terms" element={<PublicLayout><Terms /></PublicLayout>} />
+              <Route path="/cookie-policy" element={<PublicLayout><CookiePolicy /></PublicLayout>} />
               
               {/* Protected routes */}
-              <Route path="/" element={
+              <Route path="/app" element={
                 <ProtectedRoute>
                   <Layout />
                 </ProtectedRoute>
               }>
-                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route index element={<Navigate to="/app/dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
-                
                 {/* Patient routes */}
                 <Route path="patients" element={<Patients />} />
                 <Route path="patients/create" element={<PatientCreate />} />
@@ -131,7 +177,8 @@ function App() {
                 <Route path="support/knowledge-base/:id" element={<KnowledgeBaseArticleDetails />} />
                 
                 {/* Subscription routes */}
-                <Route path="subscription" element={<Subscription />} />
+                <Route path="subscription" element={<SubscriptionPage />} />
+                <Route path="billing/subscription" element={<Subscription />} />
                 
                 {/* User management */}
                 <Route path="users" element={<Users />} />
@@ -144,6 +191,9 @@ function App() {
                 
                 {/* Settings */}
                 <Route path="settings" element={<Settings />} />
+                
+                {/* AI Features */}
+                <Route path="ai" element={<AIFeatures />} />
               </Route>
               
               {/* 404 page */}

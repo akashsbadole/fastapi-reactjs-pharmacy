@@ -181,7 +181,7 @@ const Billing = () => {
         </div>
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
           <Link
-            to="/billing/create"
+            to="/app/billing/create"
             className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
           >
             <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
@@ -450,7 +450,7 @@ const Billing = () => {
                             {item.type === 'held' || activeTab === 'held' ? (
                               <>
                                 <Link
-                                  to={`/pos/hold/${item.id}`}
+                                  to={`/app/pos/hold/${item.id}`}
                                   className="text-primary-600 hover:text-primary-900"
                                 >
                                   Resume
@@ -470,14 +470,14 @@ const Billing = () => {
                             ) : (
                               <>
                                 <Link
-                                  to={`/billing/invoices/${item.id}`}
+                                  to={`/app/billing/invoices/${item.id}`}
                                   className="text-primary-600 hover:text-primary-900"
                                 >
                                   View
                                 </Link>
                                 {(item.payment_status === 'PENDING' || item.status === 'PENDING') && (
                                   <Link
-                                    to={`/billing/invoices/${item.id}/edit`}
+                                    to={`/app/billing/invoices/${item.id}/edit`}
                                     className="text-primary-600 hover:text-primary-900"
                                   >
                                     Edit
@@ -485,7 +485,7 @@ const Billing = () => {
                                 )}
                                 {(item.payment_status === 'PENDING' || item.status === 'PENDING') && (
                                   <Link
-                                    to={`/billing/invoices/${item.id}/payments`}
+                                    to={`/app/billing/invoices/${item.id}/payments`}
                                     className="text-primary-600 hover:text-primary-900"
                                   >
                                     Add Payment

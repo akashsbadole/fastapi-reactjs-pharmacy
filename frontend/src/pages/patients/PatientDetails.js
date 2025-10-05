@@ -47,7 +47,7 @@ const PatientDetails = () => {
       <div className="mb-6">
         <div className="flex items-center">
           <Link
-            to="/patients"
+            to="/app/patients"
             className="flex items-center text-primary-600 hover:text-primary-900"
           >
             <ArrowLeftIcon className="h-5 w-5 mr-1" />
@@ -135,13 +135,13 @@ const PatientDetails = () => {
               </h3>
               <div className="space-y-3">
                 <Link
-                  to={`/prescriptions/create?patient_id=${id}`}
+                  to={`/app/prescriptions/create?patient_id=${id}`}
                   className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   New Prescription
                 </Link>
                 <Link
-                  to={`/patients/${id}/edit`}
+                  to={`/app/patients/${id}/edit`}
                   className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   Edit Patient
@@ -213,7 +213,7 @@ const PatientDetails = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <Link
-                            to={`/prescriptions/${prescription.id}`}
+                            to={`/app/prescriptions/${prescription.id}`}
                             className="text-primary-600 hover:text-primary-900"
                           >
                             View
