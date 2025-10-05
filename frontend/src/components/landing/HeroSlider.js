@@ -103,7 +103,7 @@ const HeroSlider = () => {
       </div>
       
       {/* Slider Content */}
-      <div className="mx-auto max-w-7xl px-6 py-24 sm:py-32 lg:flex lg:items-center lg:gap-x-16 lg:px-8 lg:py-40">
+      <div className="mx-auto max-w-7xl px-6 py-4 sm:py-8 lg:flex lg:items-center lg:gap-x-16 lg:px-4 lg:py-8">
         <div className={`mx-auto max-w-2xl lg:mx-0 lg:flex-auto transition-all duration-1000 delay-300 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
           <div className="flex">
             <div className="relative rounded-full px-3 py-1 text-sm leading-6 text-gray-400 ring-1 ring-white/10 hover:ring-white/20 animate-pulse">

@@ -4,11 +4,15 @@ A comprehensive pharmacy management system built with FastAPI backend and React 
 
 ## Features
 
-### 🟢 Authentication & Roles
+### 🟢 Authentication & User Management
 - User registration & login with JWT/refresh tokens
+- Multi-factor authentication with 2FA support
 - Roles: Admin, Pharmacist, Cashier, Doctor
 - Permission sets per role (who can add stock, who can approve prescriptions)
-- Audit logging of login/logout & critical actions
+- Password reset functionality with email notifications
+- PIN-based authentication for POS systems
+- Profile image support for user accounts
+- Last login tracking and session management
 
 ### 🟢 Inventory Management
 - Add/edit/delete medicines with comprehensive CRUD operations
@@ -21,28 +25,38 @@ A comprehensive pharmacy management system built with FastAPI backend and React 
 - Inventory analytics dashboard with visual charts and metrics
 - Advanced search and filtering capabilities
 - Stock movement tracking and history
+- Alternative medicine mapping and substitution rules
+- Storage condition tracking and location management
+- Drug schedule classification (H1, H2, Schedule X)
 
 ### 🟢 Prescription Management
 - Create new prescriptions (by pharmacist or uploaded by doctor/patient)
 - Validate against patient allergies, drug interactions, dose limits
 - Refill management with alerts
 - Upload scanned/electronic prescriptions
+- Prescription status tracking (Pending, Approved, Filled, Cancelled)
+- Prescription numbering and formatting
+- Doctor information and license tracking
 
 ### 🟢 Patient Management
 - Patient profiles: demographics, contact info, allergies, medical history
 - Prescription history linked to patient
 - Refill and dosage reminder tracking
+- Insurance information and policy management
+- Emergency contact details
+- Date of birth and gender tracking
 
 ### 🟢 Billing & Financials
 - Invoice generation with itemized list
-- Support multiple payment modes (cash, card, insurance)
-- Handle returns/refunds
-- Sales tax/GST calculation
+- Support multiple payment modes (cash, card, insurance, online)
+- Handle returns/refunds with refund tracking
+- Sales tax/GST calculation with HSN code support
 - Daily/weekly/monthly sales reporting
 - Point of Sale (POS) system with barcode scanning
 - Split payment support and receipt generation
 - Hold bill functionality for pending payments
 - Quick sale processing for fast checkout
+- Invoice numbering and customization
 
 ### 🟢 Reporting & Analytics
 - Sales reports by day, week, month
@@ -55,6 +69,58 @@ A comprehensive pharmacy management system built with FastAPI backend and React 
 - Top medicines by stock value
 - Stock movement trends and analytics
 - Comprehensive reporting with export capabilities
+
+### 🟢 AI-Powered Features
+- Medicine prediction based on symptoms and patient history
+- Upcoming inventory needs prediction based on historical data
+- Medicine alternatives recommendation system
+- Confidence scoring for predictions
+- AI service status and capabilities monitoring
+
+### 🟢 Subscription & Billing Management
+- Multiple subscription plans with different features
+- Usage tracking and limits (users, pharmacies, storage)
+- Payment method management (credit cards, etc.)
+- Invoice generation and payment tracking
+- Automatic renewal support
+- Subscription status management (Active, Cancelled, Expired)
+- Billing history and payment processing
+
+### 🟢 Support System
+- Support ticket creation and management
+- Knowledge base articles with categorization
+- Support contact directory
+- Ticket prioritization (Low, Medium, High, Critical)
+- Status tracking (Open, In Progress, Resolved, Closed)
+- Support resources and documentation
+
+### 🟢 Audit & Compliance
+- Comprehensive audit logging of all system activities
+- User action tracking with IP addresses and timestamps
+- Resource change tracking with old/new values
+- Regulatory compliance settings
+- License and certificate management
+- Audit log retention policies
+- Compliance reporting
+
+### 🟢 Notifications & Communication
+- In-app notification system
+- Email notification support
+- SMS integration for alerts and notifications
+- WhatsApp integration capabilities
+- Notification templates and customization
+- Notification type management (expiry, low stock, refill, etc.)
+
+### 🟢 System Settings & Configuration
+- Organization settings (store details, tax info, formats)
+- User roles and permissions management
+- POS settings (payment methods, receipt layout)
+- Inventory settings (reorder levels, expiry alerts)
+- Integration settings (payment gateways, accounting software)
+- Compliance and regulatory settings
+- Backup and data management
+- Theme and UI customization
+- Notification preferences and templates
 
 ## Tech Stack
 
@@ -318,16 +384,22 @@ This project is licensed under the MIT License.
 ## Current Implementation Status
 
 ### ✅ Fully Implemented Features
-- **Authentication & User Management**: Complete JWT-based authentication with role-based access control
-- **Inventory Management**: Full CRUD operations for medicines with batch tracking
+- **Authentication & User Management**: Complete JWT-based authentication with role-based access control, 2FA support, and PIN-based POS authentication
+- **Inventory Management**: Full CRUD operations for medicines with batch tracking, expiry alerts, and alternative medicine mapping
 - **CSV Import/Export**: Bulk data management with validation and error handling
 - **Batch Management**: Create and manage medicine batches with expiry tracking
 - **Inventory Analytics**: Interactive dashboard with charts and metrics
-- **Point of Sale (POS)**: Complete sales system with barcode scanning and payment processing
+- **Point of Sale (POS)**: Complete sales system with barcode scanning, payment processing, and hold bill functionality
 - **Supplier Management**: Add and manage suppliers for inventory tracking
 - **Stock Alerts**: Automated notifications for low stock and expiry items
 - **Search & Filtering**: Advanced search capabilities across all modules
 - **Responsive UI**: Mobile-friendly interface with Tailwind CSS
+- **AI-Powered Features**: Medicine prediction based on symptoms, inventory needs prediction, and medicine alternatives
+- **Subscription Management**: Complete subscription system with plans, payment methods, and billing
+- **Support System**: Ticket management, knowledge base, and support resources
+- **Audit Logging**: Comprehensive activity tracking with user actions and resource changes
+- **Notifications**: In-app notifications with email and SMS integration
+- **System Settings**: Comprehensive configuration options for all system modules
 
 ### 🚧 In Progress
 - **Prescription Management**: Basic functionality implemented, validation in progress
@@ -339,19 +411,14 @@ This project is licensed under the MIT License.
 - **Mobile App**: Native mobile application for iOS and Android
 - **Integration APIs**: Third-party integrations with accounting and EMS systems
 - **Multi-Store Support**: Chain pharmacy management capabilities
-- **AI-Powered Features**: Drug interaction checking and dosage recommendations
+- **Enhanced AI Features**: Advanced drug interaction checking and dosage recommendations
 
 ### Additional Suggested Modules
 
-- User & Role Management: Admin, Pharmacist, Cashier roles with permissions
-- Audit Trails: Full activity logs for compliance
-- Security & Backup: Automated cloud backups, encryption
-- Mobile App/Responsive: Mobile POS for home delivery staff
 - Delivery Management: Manage home deliveries & riders
-- SMS/Email Integration: Automated notifications for refills, bills
 - Supplier Portal: Vendors can upload invoices or check PO status
-- Regulatory Compliance: Schedule H, X, NDPS tracking
-- Analytics Dashboard: Forecasting, top-selling drugs, demand trends
+- Advanced Analytics: Enhanced forecasting and demand trends
+- Mobile App: Native mobile application for field staff
 
 
 #### Settings Menu
