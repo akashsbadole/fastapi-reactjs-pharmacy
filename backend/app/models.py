@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Boolean, Float, Foreig
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
+from .multi_tenant_models import Tenant
 import enum
 
 # Enums
@@ -34,10 +35,11 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True, nullable=False)
-    email = Column(String, unique=True, index=True, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    username = Column(String, index=True, nullable=False)
+    email = Column(String, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
-    pin = Column(String, unique=True, index=True)  # 4-digit PIN for POS login
+    pin = Column(String, index=True)  # 4-digit PIN for POS login
     full_name = Column(String, nullable=False)
     phone = Column(String)
     role = Column(Enum(UserRole), default=UserRole.CASHIER)
@@ -51,6 +53,7 @@ class User(Base):
     last_login = Column(DateTime(timezone=True))
     
     # Relationships
+    tenant = relationship("Tenant", back_populates="users")
     prescriptions_created = relationship("Prescription", back_populates="created_by_user")
     audit_logs = relationship("AuditLog", back_populates="user")
 
@@ -59,7 +62,8 @@ class Patient(Base):
     __tablename__ = "patients"
     
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(String, unique=True, index=True, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    patient_id = Column(String, index=True, nullable=False)
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     date_of_birth = Column(Date, nullable=False)
@@ -84,6 +88,7 @@ class Supplier(Base):
     __tablename__ = "suppliers"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     name = Column(String, nullable=False)
     contact_person = Column(String)
     phone = Column(String, nullable=False)
@@ -102,6 +107,7 @@ class Medicine(Base):
     __tablename__ = "medicines"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     name = Column(String, nullable=False, index=True)
     generic_name = Column(String)
     brand = Column(String)
@@ -111,10 +117,10 @@ class Medicine(Base):
     strength = Column(String)  # 500mg, 10ml, etc.
     manufacturer = Column(String)
     requires_prescription = Column(Boolean, default=False)
-    barcode = Column(String, unique=True, index=True)
+    barcode = Column(String, index=True)
     
     # Additional pharmacy management fields
-    sku = Column(String, unique=True, index=True)  # Stock Keeping Unit
+    sku = Column(String, index=True)  # Stock Keeping Unit
     pack_size = Column(String)  # e.g., "10 tablets", "100ml bottle"
     hsn_code = Column(String)  # HSN/SAC code for taxation
     mrp = Column(Float)  # Maximum Retail Price
@@ -143,6 +149,7 @@ class MedicineBatch(Base):
     __tablename__ = "medicine_batches"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     batch_number = Column(String, nullable=False)
     medicine_id = Column(Integer, ForeignKey("medicines.id"), nullable=False)
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
@@ -167,6 +174,7 @@ class StockMovement(Base):
     __tablename__ = "stock_movements"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     batch_id = Column(Integer, ForeignKey("medicine_batches.id"), nullable=False)
     movement_type = Column(String, nullable=False)  # IN, OUT, ADJUSTMENT
     quantity = Column(Integer, nullable=False)
@@ -185,7 +193,8 @@ class Prescription(Base):
     __tablename__ = "prescriptions"
     
     id = Column(Integer, primary_key=True, index=True)
-    prescription_number = Column(String, unique=True, index=True, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    prescription_number = Column(String, index=True, nullable=False)
     patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     doctor_name = Column(String)
@@ -209,6 +218,7 @@ class PrescriptionItem(Base):
     __tablename__ = "prescription_items"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     prescription_id = Column(Integer, ForeignKey("prescriptions.id"), nullable=False)
     medicine_id = Column(Integer, ForeignKey("medicines.id"), nullable=False)
     batch_id = Column(Integer, ForeignKey("medicine_batches.id"))
@@ -229,7 +239,8 @@ class Invoice(Base):
     __tablename__ = "invoices"
     
     id = Column(Integer, primary_key=True, index=True)
-    invoice_number = Column(String, unique=True, index=True, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    invoice_number = Column(String, index=True, nullable=False)
     patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
     subtotal = Column(Float, nullable=False)
     tax_amount = Column(Float, default=0.0)
@@ -253,6 +264,7 @@ class InvoiceItem(Base):
     __tablename__ = "invoice_items"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
     prescription_id = Column(Integer, ForeignKey("prescriptions.id"))
     medicine_id = Column(Integer, ForeignKey("medicines.id"), nullable=False)
@@ -274,6 +286,7 @@ class Payment(Base):
     __tablename__ = "payments"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
     amount = Column(Float, nullable=False)
     payment_mode = Column(Enum(PaymentMode), nullable=False)
@@ -291,7 +304,8 @@ class Refund(Base):
     __tablename__ = "refunds"
     
     id = Column(Integer, primary_key=True, index=True)
-    refund_number = Column(String, unique=True, index=True, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    refund_number = Column(String, index=True, nullable=False)
     invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
     amount = Column(Float, nullable=False)
     reason = Column(Text, nullable=False)
@@ -308,6 +322,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     action = Column(String, nullable=False)
     resource_type = Column(String, nullable=False)
@@ -326,6 +341,7 @@ class Notification(Base):
     __tablename__ = "notifications"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     title = Column(String, nullable=False)
     message = Column(Text, nullable=False)
     type = Column(String, nullable=False)  # EXPIRY, LOW_STOCK, REFILL, etc.
@@ -342,7 +358,8 @@ class HoldBill(Base):
     __tablename__ = "hold_bills"
     
     id = Column(Integer, primary_key=True, index=True)
-    hold_number = Column(String, unique=True, index=True, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    hold_number = Column(String, index=True, nullable=False)
     cart_data = Column(Text, nullable=False)  # JSON data for cart
     customer_info = Column(Text)  # JSON data for customer
     held_by = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -361,6 +378,7 @@ class OrganizationSettings(Base):
     __tablename__ = "organization_settings"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     store_name = Column(String, nullable=False, default="Pharmacy Store")
     address = Column(String)
     city = Column(String)
@@ -391,6 +409,7 @@ class POSSettings(Base):
     __tablename__ = "pos_settings"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     payment_methods = Column(Text)  # JSON string
     barcode_scanning = Column(Text)  # JSON string
     receipt = Column(Text)  # JSON string
@@ -405,6 +424,7 @@ class ThemeSettings(Base):
     __tablename__ = "theme_settings"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     theme_mode = Column(String, default="light")
     color_scheme = Column(Text)  # JSON string
     branding = Column(Text)  # JSON string
@@ -419,6 +439,7 @@ class InventorySettings(Base):
     __tablename__ = "inventory_settings"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     reorder_settings = Column(Text)  # JSON string
     expiry_alerts = Column(Text)  # JSON string
     low_stock_alerts = Column(Text)  # JSON string
@@ -434,6 +455,7 @@ class NotificationSettings(Base):
     __tablename__ = "notification_settings"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     email_settings = Column(Text)  # JSON string
     sms_settings = Column(Text)  # JSON string
     whatsapp_settings = Column(Text)  # JSON string
@@ -448,6 +470,7 @@ class IntegrationSettings(Base):
     __tablename__ = "integration_settings"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     payment_gateway = Column(Text)  # JSON string
     eprescription = Column(Text)  # JSON string
     accounting = Column(Text)  # JSON string
@@ -464,6 +487,7 @@ class ComplianceSettings(Base):
     __tablename__ = "compliance_settings"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     regulatory = Column(Text)  # JSON string
     licenses = Column(Text)  # JSON string
     audit = Column(Text)  # JSON string
@@ -479,6 +503,7 @@ class SupportTicket(Base):
     __tablename__ = "support_tickets"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     subject = Column(String, nullable=False)
     description = Column(Text, nullable=False)
@@ -496,6 +521,7 @@ class KnowledgeBaseArticle(Base):
     __tablename__ = "knowledge_base_articles"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     title = Column(String, nullable=False)
     content = Column(Text, nullable=False)
     category = Column(String, nullable=False)
@@ -513,6 +539,7 @@ class SupportContact(Base):
     __tablename__ = "support_contacts"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     name = Column(String, nullable=False)
     email = Column(String, nullable=False)
     phone = Column(String)
@@ -526,6 +553,7 @@ class SupportResource(Base):
     __tablename__ = "support_resources"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     resource_type = Column(String, nullable=False)  # VIDEO, DOCUMENT, LINK
@@ -562,6 +590,7 @@ class UserSubscription(Base):
     __tablename__ = "user_subscriptions"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     plan_id = Column(Integer, ForeignKey("subscription_plans.id"), nullable=False)
     status = Column(String, default="ACTIVE")  # ACTIVE, CANCELLED, EXPIRED, PENDING
@@ -581,6 +610,7 @@ class PaymentMethod(Base):
     __tablename__ = "payment_methods"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     method_type = Column(String, nullable=False)  # CREDIT_CARD, PAYPAL, BANK_TRANSFER
     last_four = Column(String)  # Last 4 digits of card or account
@@ -601,9 +631,10 @@ class SubscriptionInvoice(Base):
     __tablename__ = "subscription_invoices"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     subscription_id = Column(Integer, ForeignKey("user_subscriptions.id"), nullable=False)
-    invoice_number = Column(String, unique=True, nullable=False)
+    invoice_number = Column(String, index=True, nullable=False)
     amount = Column(Integer, nullable=False)  # Amount in cents
     due_date = Column(DateTime(timezone=True), nullable=False)
     status = Column(String, default="PENDING")  # PENDING, PAID, OVERDUE, CANCELLED
@@ -622,6 +653,7 @@ class SubscriptionPayment(Base):
     __tablename__ = "subscription_payments"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     invoice_id = Column(Integer, ForeignKey("subscription_invoices.id"), nullable=False)
     amount = Column(Integer, nullable=False)  # Amount in cents
     payment_method_id = Column(Integer, ForeignKey("payment_methods.id"), nullable=False)
@@ -639,6 +671,7 @@ class BackupSettings(Base):
     __tablename__ = "backup_settings"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     automatic_backup = Column(Text)  # JSON string
     cloud_backup = Column(Text)  # JSON string
     local_backup = Column(Text)  # JSON string
@@ -654,6 +687,7 @@ class UserRolesSettings(Base):
     __tablename__ = "user_roles_settings"
     
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     roles = Column(Text)  # JSON string
     permissions = Column(Text)  # JSON string
     

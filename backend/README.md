@@ -2,6 +2,10 @@
 
 A comprehensive pharmacy management system built with FastAPI, PostgreSQL, and Redis.
 
+## Screenshot
+
+![home](home.png "home")
+
 ## Features
 
 - **Authentication & Authorization**: JWT-based authentication with role-based access control
@@ -75,23 +79,27 @@ backend/
 1. Clone the repository
 2. Navigate to the backend directory
 3. Create a virtual environment:
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 4. Install dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
 
 5. Set up environment variables:
+
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
 6. Run database migrations:
+
    ```bash
    alembic upgrade head
    ```
@@ -104,6 +112,7 @@ backend/
 ### Using Docker
 
 1. Build and start all services:
+
    ```bash
    docker-compose up --build
    ```
@@ -116,12 +125,14 @@ backend/
 ## API Documentation
 
 Once the application is running, you can access the interactive API documentation at:
+
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 
 ## Authentication
 
 The API uses JWT tokens for authentication. Include the token in the Authorization header:
+
 ```
 Authorization: Bearer <your-jwt-token>
 ```
@@ -129,6 +140,7 @@ Authorization: Bearer <your-jwt-token>
 ## Roles
 
 The system supports the following roles:
+
 - **Admin**: Full system access
 - **Pharmacist**: Can manage inventory, prescriptions, and billing
 - **Cashier**: Can manage patients and billing
@@ -137,16 +149,19 @@ The system supports the following roles:
 ## Database Migrations
 
 To create a new migration:
+
 ```bash
 alembic revision --autogenerate -m "Description of changes"
 ```
 
 To apply migrations:
+
 ```bash
 alembic upgrade head
 ```
 
 To rollback migrations:
+
 ```bash
 alembic downgrade -1
 ```
@@ -154,6 +169,7 @@ alembic downgrade -1
 ## Testing
 
 Run tests with:
+
 ```bash
 pytest
 ```

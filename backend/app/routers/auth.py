@@ -3,9 +3,10 @@ from typing import List
 import os
 import uuid
 import secrets
+import pyotp
 
 try:
-    from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+    from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
     from fastapi.security import HTTPBearer
 except ImportError:
     print("FastAPI import error - please ensure FastAPI is installed")
@@ -17,6 +18,7 @@ from sqlalchemy import func
 
 from ..database import get_db
 from ..models import User, AuditLog
+from ..middleware import get_current_tenant_id
 from ..schemas.auth import (
     User as UserSchema, UserCreate, UserUpdate, LoginRequest, Token, RefreshTokenRequest,
     PasswordChange, StaffLoginRequest, StaffLoginResponse, ProfileImageUpload,
@@ -35,25 +37,43 @@ router = APIRouter()
 security = HTTPBearer()
 
 @router.post("/register", response_model=UserSchema)
-async def register(user: UserCreate, db: Session = Depends(get_db)):
-    # Check if user already exists
-    db_user = db.query(User).filter(User.username == user.username).first()
+async def register(
+    user: UserCreate,
+    db: Session = Depends(get_db),
+    request: Request = None
+):
+    # Get tenant ID from request
+    try:
+        tenant_id = get_current_tenant_id(request)
+    except:
+        # If no tenant is identified, use default tenant (for system admin)
+        tenant_id = 1
+    
+    # Check if user already exists in the same tenant
+    db_user = db.query(User).filter(
+        User.username == user.username,
+        User.tenant_id == tenant_id
+    ).first()
     if db_user:
         raise HTTPException(
             status_code=400,
-            detail="Username already registered"
+            detail="Username already registered in this tenant"
         )
     
-    db_user = db.query(User).filter(User.email == user.email).first()
+    db_user = db.query(User).filter(
+        User.email == user.email,
+        User.tenant_id == tenant_id
+    ).first()
     if db_user:
         raise HTTPException(
             status_code=400,
-            detail="Email already registered"
+            detail="Email already registered in this tenant"
         )
     
     # Create new user
     hashed_password = get_password_hash(user.password)
     db_user = User(
+        tenant_id=tenant_id,
         username=user.username,
         email=user.email,
         full_name=user.full_name,
@@ -68,6 +88,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     
     # Create audit log
     audit_log = AuditLog(
+        tenant_id=tenant_id,
         user_id=db_user.id,
         action="CREATE",
         resource_type="USER",
@@ -84,9 +105,28 @@ async def test_auth():
     return {"message": "Auth router working"}
 
 @router.post("/login", response_model=Token)
-async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
+async def login(
+    login_data: LoginRequest,
+    db: Session = Depends(get_db),
+    request: Request = None
+):
     try:
-        user = authenticate_user(db, login_data.username, login_data.password)
+        # Get tenant ID from request
+        try:
+            tenant_id = get_current_tenant_id(request)
+        except:
+            # If no tenant is identified, try to find user by username across all tenants
+            user = db.query(User).filter(User.username == login_data.username).first()
+            if user:
+                tenant_id = user.tenant_id
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Incorrect username or password",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        
+        user = authenticate_user(db, login_data.username, login_data.password, tenant_id)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -97,9 +137,9 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         # Proceed with normal login
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
-            data={"sub": user.username}, expires_delta=access_token_expires
+            data={"sub": user.username, "tenant_id": user.tenant_id}, expires_delta=access_token_expires
         )
-        refresh_token = create_refresh_token(data={"sub": user.username})
+        refresh_token = create_refresh_token(data={"sub": user.username, "tenant_id": user.tenant_id})
         
         # Update last login
         user.last_login = func.now()
@@ -108,6 +148,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         # Create audit log
         try:
             audit_log = AuditLog(
+                tenant_id=user.tenant_id,
                 user_id=user.id,
                 action="LOGIN",
                 resource_type="USER",
@@ -131,7 +172,10 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         raise
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(refresh_data: RefreshTokenRequest, db: Session = Depends(get_db)):
+async def refresh_token(
+    refresh_data: RefreshTokenRequest,
+    db: Session = Depends(get_db)
+):
     token_data = verify_token(refresh_data.refresh_token, token_type="refresh")
     if token_data is None:
         raise HTTPException(
@@ -140,7 +184,10 @@ async def refresh_token(refresh_data: RefreshTokenRequest, db: Session = Depends
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    user = db.query(User).filter(User.username == token_data.username).first()
+    user = db.query(User).filter(
+        User.username == token_data.username,
+        User.tenant_id == token_data.tenant_id
+    ).first()
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -149,9 +196,9 @@ async def refresh_token(refresh_data: RefreshTokenRequest, db: Session = Depends
     
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": user.username, "tenant_id": user.tenant_id}, expires_delta=access_token_expires
     )
-    refresh_token = create_refresh_token(data={"sub": user.username})
+    refresh_token = create_refresh_token(data={"sub": user.username, "tenant_id": user.tenant_id})
     
     return {
         "access_token": access_token,
@@ -243,7 +290,8 @@ async def list_users(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    users = db.query(User).offset(skip).limit(limit).all()
+    # Only list users from the same tenant
+    users = db.query(User).filter(User.tenant_id == current_user.tenant_id).offset(skip).limit(limit).all()
     return users
 
 @router.get("/users/{user_id}", response_model=UserSchema)
@@ -252,7 +300,11 @@ async def get_user(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.id == user_id).first()
+    # Only get users from the same tenant
+    user = db.query(User).filter(
+        User.id == user_id,
+        User.tenant_id == current_user.tenant_id
+    ).first()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user
@@ -264,7 +316,11 @@ async def update_user(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    db_user = db.query(User).filter(User.id == user_id).first()
+    # Only update users from the same tenant
+    db_user = db.query(User).filter(
+        User.id == user_id,
+        User.tenant_id == current_user.tenant_id
+    ).first()
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -315,7 +371,11 @@ async def delete_user(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    db_user = db.query(User).filter(User.id == user_id).first()
+    # Only delete users from the same tenant
+    db_user = db.query(User).filter(
+        User.id == user_id,
+        User.tenant_id == current_user.tenant_id
+    ).first()
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -354,7 +414,11 @@ async def toggle_user_status(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    db_user = db.query(User).filter(User.id == user_id).first()
+    # Only toggle status of users from the same tenant
+    db_user = db.query(User).filter(
+        User.id == user_id,
+        User.tenant_id == current_user.tenant_id
+    ).first()
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -383,9 +447,28 @@ async def toggle_user_status(
     return {"message": f"User is now {'active' if db_user.is_active else 'inactive'}"}
 
 @router.post("/staff-login", response_model=StaffLoginResponse)
-async def staff_login(login_data: StaffLoginRequest, db: Session = Depends(get_db)):
+async def staff_login(
+    login_data: StaffLoginRequest,
+    db: Session = Depends(get_db),
+    request: Request = None
+):
     try:
-        user = authenticate_staff(db, login_data.username, login_data.pin)
+        # Get tenant ID from request
+        try:
+            tenant_id = get_current_tenant_id(request)
+        except:
+            # If no tenant is identified, try to find user by username across all tenants
+            user = db.query(User).filter(User.username == login_data.username).first()
+            if user:
+                tenant_id = user.tenant_id
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Incorrect username or PIN",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        
+        user = authenticate_staff(db, login_data.username, login_data.pin, tenant_id)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -395,7 +478,7 @@ async def staff_login(login_data: StaffLoginRequest, db: Session = Depends(get_d
         
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
-            data={"sub": user.username}, expires_delta=access_token_expires
+            data={"sub": user.username, "tenant_id": user.tenant_id}, expires_delta=access_token_expires
         )
         
         # Update last login
@@ -405,6 +488,7 @@ async def staff_login(login_data: StaffLoginRequest, db: Session = Depends(get_d
         # Create audit log
         try:
             audit_log = AuditLog(
+                tenant_id=user.tenant_id,
                 user_id=user.id,
                 action="STAFF_LOGIN",
                 resource_type="USER",

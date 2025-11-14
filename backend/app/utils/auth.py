@@ -71,6 +71,7 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
         
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")
+        tenant_id: int = payload.get("tenant_id")
         
         print(f"Token payload: {payload}")
         
@@ -82,7 +83,7 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
             print("No username in token")
             return None
             
-        token_data = TokenData(username=username)
+        token_data = TokenData(username=username, tenant_id=tenant_id)
         return token_data
     except JWTError as e:
         print(f"JWT error: {e}")
@@ -91,16 +92,30 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
         print(f"Unexpected error verifying token: {e}")
         return None
 
-def authenticate_user(db: Session, username: str, password: str) -> Union[bool, User]:
-    user = db.query(User).filter(User.username == username).first()
+def authenticate_user(db: Session, username: str, password: str, tenant_id: int = None) -> Union[bool, User]:
+    if tenant_id:
+        user = db.query(User).filter(
+            User.username == username,
+            User.tenant_id == tenant_id
+        ).first()
+    else:
+        user = db.query(User).filter(User.username == username).first()
+    
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
         return False
     return user
 
-def authenticate_staff(db: Session, username: str, pin: str) -> Union[bool, User]:
-    user = db.query(User).filter(User.username == username).first()
+def authenticate_staff(db: Session, username: str, pin: str, tenant_id: int = None) -> Union[bool, User]:
+    if tenant_id:
+        user = db.query(User).filter(
+            User.username == username,
+            User.tenant_id == tenant_id
+        ).first()
+    else:
+        user = db.query(User).filter(User.username == username).first()
+    
     if not user:
         return False
     if not user.pin:
@@ -141,7 +156,10 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         if token_data is None:
             raise credentials_exception
             
-        user = db.query(User).filter(User.username == token_data.username).first()
+        user = db.query(User).filter(
+            User.username == token_data.username,
+            User.tenant_id == token_data.tenant_id
+        ).first()
         if user is None:
             raise credentials_exception
             

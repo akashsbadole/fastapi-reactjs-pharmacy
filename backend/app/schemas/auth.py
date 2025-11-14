@@ -42,6 +42,7 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+    tenant_id: Optional[int] = None
 
 class LoginRequest(BaseModel):
     username: str

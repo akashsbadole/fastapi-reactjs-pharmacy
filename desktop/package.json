@@ -1,0 +1,87 @@
+{
+  "name": "pharmacy-management-desktop",
+  "version": "1.0.0",
+  "description": "Pharmacy Management System Desktop Application",
+  "main": "public/electron.js",
+  "homepage": "./",
+  "private": true,
+  "dependencies": {
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.14.19",
+    "@mui/material": "^5.14.19",
+    "@testing-library/jest-dom": "^5.16.4",
+    "@testing-library/react": "^13.3.0",
+    "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.4.0",
+    "chart.js": "^4.5.0",
+    "electron-is-dev": "^2.0.0",
+    "electron-updater": "^6.6.2",
+    "react": "^18.2.0",
+    "react-chartjs-2": "^5.3.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.3.0",
+    "react-scripts": "^5.0.1",
+    "web-vitals": "^2.1.4"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "electron": "^38.2.1",
+    "electron-builder": "^24.4.0",
+    "wait-on": "^7.0.1"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "test:desktop": "node test-desktop-app.js",
+    "eject": "react-scripts eject",
+    "electron": "electron .",
+    "electron-dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron-pack": "electron-builder",
+    "preelectron-pack": "npm run build",
+    "package:win": "electron-builder --win",
+    "package:mac": "electron-builder --mac",
+    "package:linux": "electron-builder --linux",
+    "package:all": "electron-builder -mwl"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "build": {
+    "appId": "com.pharmacy.management.desktop",
+    "productName": "Pharmacy Management System",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "build/**/*",
+      "node_modules/**/*",
+      "public/electron.js"
+    ],
+    "mac": {
+      "category": "public.app-category.medical"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

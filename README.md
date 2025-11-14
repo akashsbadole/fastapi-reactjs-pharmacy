@@ -1,6 +1,6 @@
 # Pharmacy Management System
 
-A comprehensive pharmacy management system built with FastAPI backend and React frontend.
+A comprehensive pharmacy management system built with FastAPI backend and React frontend, now with multi-tenant support and a desktop application.
 
 ## Features
 
@@ -13,6 +13,25 @@ A comprehensive pharmacy management system built with FastAPI backend and React 
 - PIN-based authentication for POS systems
 - Profile image support for user accounts
 - Last login tracking and session management
+
+### 🟢 Multi-Tenant Architecture
+- Complete data isolation between tenants
+- Subdomain-based tenant identification (tenant.pharmacy.com)
+- Custom domain support for enterprise clients
+- Tenant-specific settings and configurations
+- User invitations and tenant management
+- Shared database with tenant isolation
+- Scalable architecture for SaaS deployment
+
+### 🟢 Desktop Application
+- Cross-platform desktop app (Windows, macOS, Linux)
+- Offline functionality with data synchronization
+- Modern Material-UI interface
+- Barcode scanning support
+- Receipt printing capabilities
+- Local data caching for performance
+- Automatic updates and notifications
+- Complete offline mode operation
 
 ### 🟢 Inventory Management
 - Add/edit/delete medicines with comprehensive CRUD operations
@@ -147,6 +166,14 @@ A comprehensive pharmacy management system built with FastAPI backend and React 
 - **React Hot Toast**: Notification system
 - **Chart.js/Recharts**: Data visualization for analytics
 
+### Desktop Application
+- **Electron**: Cross-platform desktop application framework
+- **Material-UI (MUI)**: Component library for modern UI
+- **React**: Frontend framework
+- **Node.js**: Runtime environment
+- **Chart.js**: Data visualization
+- **Offline Storage**: Local data caching and synchronization
+
 ## Project Structure
 
 ```
@@ -167,6 +194,15 @@ pharmacy-management-system/
 │   │   ├── pages/          # Page components
 │   │   └── services/       # API services
 │   ├── public/             # Static files
+│   └── package.json        # Node.js dependencies
+├── desktop/                # Electron desktop application
+│   ├── src/
+│   │   ├── components/     # React components for desktop
+│   │   ├── services/       # API services
+│   │   └── App.js          # Main desktop app
+│   ├── public/
+│   │   ├── electron.js     # Electron main process
+│   │   └── preload.js      # Preload script
 │   └── package.json        # Node.js dependencies
 ├── docker-compose.yml      # Docker configuration
 └── README.md              # This file
@@ -202,6 +238,28 @@ pharmacy-management-system/
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
    - API Documentation: http://localhost:8000/docs
+
+### Desktop Application
+
+1. Install dependencies:
+   ```bash
+   cd desktop
+   npm install
+   ```
+
+2. Configure API endpoint:
+   ```bash
+   # Create .env file
+   echo "REACT_APP_API_URL=http://localhost:8000" > .env
+   echo "REACT_APP_TENANT_ID=default" >> .env
+   ```
+
+3. Start the desktop application:
+   ```bash
+   npm start
+   ```
+
+For detailed desktop application setup, see [Desktop Application Guide](./DESKTOP_APPLICATION_GUIDE.md).
 
 ### Local Development
 
@@ -287,6 +345,39 @@ If you prefer to set up manually:
    npm start
    ```
 
+## Multi-Tenant Setup
+
+### Default Tenant
+
+The system automatically creates a default tenant with ID "default" during initial setup.
+
+### Creating New Tenants
+
+1. **Via API:**
+   ```bash
+   curl -X POST "http://localhost:8000/api/tenants/" \
+   -H "Content-Type: application/json" \
+   -d '{
+     "name": "Pharmacy Name",
+     "subdomain": "pharmacy",
+     "admin_email": "admin@pharmacy.com",
+     "plan": "premium"
+   }'
+   ```
+
+2. **Via Admin Panel:**
+   - Access the admin panel
+   - Navigate to Tenant Management
+   - Create new tenant with required details
+
+### Subdomain Configuration
+
+For production deployment, configure subdomain routing:
+- See [Subdomain Setup Guide](./SUBDOMAIN_SETUP_GUIDE.md)
+- Configure DNS records
+- Set up reverse proxy
+- Configure SSL certificates
+
 ## Default Credentials
 
 For testing purposes, you can use these default credentials:
@@ -339,6 +430,12 @@ cd frontend
 npm test
 ```
 
+### Desktop Application Tests
+```bash
+cd desktop
+npm test
+```
+
 ## Deployment
 
 ### Production Build
@@ -354,18 +451,44 @@ npm test
    docker-compose -f docker-compose.prod.yml up --build
    ```
 
+### Desktop Application Distribution
+
+1. Build for production:
+   ```bash
+   cd desktop
+   npm run build
+   ```
+
+2. Package application:
+   ```bash
+   # For Windows
+   npm run electron-pack:win
+   
+   # For macOS
+   npm run electron-pack:mac
+   
+   # For Linux
+   npm run electron-pack:linux
+   ```
+
 ### Environment Variables
 
 #### Backend (.env)
-```
+```env
 DATABASE_URL=postgresql://postgres:password@localhost/pharmacy_db
 SECRET_KEY=your-secret-key-here-change-in-production
 REDIS_URL=redis://localhost:6379
 ```
 
 #### Frontend (.env)
-```
+```env
 REACT_APP_API_URL=http://localhost:8000
+```
+
+#### Desktop (.env)
+```env
+REACT_APP_API_URL=http://localhost:8000
+REACT_APP_TENANT_ID=default
 ```
 
 ## Contributing
@@ -385,6 +508,8 @@ This project is licensed under the MIT License.
 
 ### ✅ Fully Implemented Features
 - **Authentication & User Management**: Complete JWT-based authentication with role-based access control, 2FA support, and PIN-based POS authentication
+- **Multi-Tenant Architecture**: Complete multi-tenant system with data isolation, subdomain support, and tenant management
+- **Desktop Application**: Full-featured desktop app with offline functionality, barcode scanning, and receipt printing
 - **Inventory Management**: Full CRUD operations for medicines with batch tracking, expiry alerts, and alternative medicine mapping
 - **CSV Import/Export**: Bulk data management with validation and error handling
 - **Batch Management**: Create and manage medicine batches with expiry tracking
@@ -420,175 +545,13 @@ This project is licensed under the MIT License.
 - Advanced Analytics: Enhanced forecasting and demand trends
 - Mobile App: Native mobile application for field staff
 
+## Documentation
 
-#### Settings Menu
-1️⃣ Organization / Pharmacy Settings
-
-Store Name, Address, Logo, Contact info
-
-Tax/GST numbers, HSN code defaults
-
-Default currency, time zone, date formats
-
-Invoice numbering format & prefixes
-
-Prescription numbering format
-
-2️⃣ User & Roles Management
-
-Add/Edit Users (Admin, Pharmacist, Cashier, Accountant)
-
-Role-based permissions (who can view/edit/approve)
-
-2FA / password policies
-
-3️⃣ POS Settings
-
-Default payment methods
-
-Enable/disable barcode scanning
-
-Receipt/invoice print layout & branding
-
-Default discount/tax configuration
-
-Counter/terminal setup
-
-4️⃣ Inventory Settings
-
-Reorder level defaults
-
-Expiry alerts (how many days in advance)
-
-Alternative medicine mapping rules
-
-Batch-wise pricing toggle
-
-5️⃣ Notifications / Communication
-
-Email/SMS gateway setup
-
-Templates for invoices, reminders, refill alerts
-
-WhatsApp integration API keys
-
-6️⃣ Integration Settings
-
-Insurance provider integration
-
-E-prescription provider integration
-
-Accounting software sync (Tally, QuickBooks, Zoho)
-
-Payment gateway setup (UPI, cards)
-
-7️⃣ Compliance & Regulations
-
-Schedule H, X, NDPS tracking settings
-
-Upload license & certificates
-
-Audit log retention period
-
-8️⃣ Backup & Data
-
-Automatic backups (local/cloud)
-
-Data import/export (CSV, JSON, XML)
-
-GDPR/data privacy options
-
-9️⃣ Theme & UI
-
-Color theme selection (dark/light mode)
-
-Logo, favicon, branding customization
+- [Desktop Application Guide](./DESKTOP_APPLICATION_GUIDE.md)
+- [Multi-Tenant Implementation](./MULTI_TENANT_IMPLEMENTATION.md)
+- [Subdomain Setup Guide](./SUBDOMAIN_SETUP_GUIDE.md)
+- [Desktop Application Options](./DESKTOP_APPLICATION_OPTIONS.md)
 
 ## Support
 
 For support and questions, please open an issue in the repository.
-
-
-## Issue
-
-
-Below feature and functionality
-Settings
-Manage your pharmacy system configuration and preferences
-
-
-Organization Settings
-Store details, tax info, and formats
-
-User & Roles
-Manage users and their permissions
-
-POS Settings
-Payment methods and receipt layout
-
-Inventory Settings
-Reorder levels and expiry alerts
-
-Notifications
-Email/SMS templates and gateways
-
-Integrations
-Third-party service connections
-
-Compliance
-Regulatory settings and licenses
-
-Backup & Data
-Data backup and import/export
-
-Theme & UI
-Appearance and branding
-
-
-
-------
-
-@problems @/backend/app/routers/settings.py  @/frontend/src/contexts/SettingsContext.js @/frontend/src/pages/settings/OrganizationSettings.js @/frontend/src/pages/settings/ThemeSettings.js @/frontend/src/pages/settings/POSSettings.js @/frontend/src/pages/settings @/frontend/src/pages/settings/Settings.js  Most of features and functionality are not working, MAKE ALL FEATURES AND FUNCTIONALITY
-
-Below feature and functionality
-Settings
-Manage your pharmacy system configuration and preferences
-
-
-Organization Settings
-Store details, tax info, and formats
--------------------------------
-
-@problems @/backend/app/routers/settings.py  @/frontend/src/contexts/SettingsContext.js @/frontend/src/pages/settings/OrganizationSettings.js @/frontend/src/pages/settings/ThemeSettings.js @/frontend/src/pages/settings/POSSettings.js @/frontend/src/pages/settings @/frontend/src/pages/settings/Settings.js  Most of features and functionality are not working, MAKE ALL FEATURES AND FUNCTIONALITY
-
-User & Roles
-Manage users and their permissions
-
-POS Settings
-Payment methods and receipt layout
-
-----------------------------111
-@problems @/backend/app/routers/settings.py  @/frontend/src/contexts/SettingsContext.js @/frontend/src/pages/settings/OrganizationSettings.js @/frontend/src/pages/settings/ThemeSettings.js @/frontend/src/pages/settings/POSSettings.js @/frontend/src/pages/settings @/frontend/src/pages/settings/Settings.js  Most of features and functionality are not working, MAKE ALL FEATURES AND FUNCTIONALITY
-
-Inventory Settings
-Reorder levels and expiry alerts
-
-Notifications
-Email/SMS templates and gateways   ->>>>>>>>>
-
--------------------22
-@problems @/backend/app/routers/settings.py  @/frontend/src/contexts/SettingsContext.js @/frontend/src/pages/settings/OrganizationSettings.js @/frontend/src/pages/settings/ThemeSettings.js @/frontend/src/pages/settings/POSSettings.js @/frontend/src/pages/settings @/frontend/src/pages/settings/Settings.js  Most of features and functionality are not working, MAKE ALL FEATURES AND FUNCTIONALITY
-
-Integrations
-Third-party service connections
-
-Compliance
-Regulatory settings and licenses
-------------------
-@problems @/backend/app/routers/settings.py  @/frontend/src/contexts/SettingsContext.js @/frontend/src/pages/settings/OrganizationSettings.js @/frontend/src/pages/settings/ThemeSettings.js @/frontend/src/pages/settings/POSSettings.js @/frontend/src/pages/settings @/frontend/src/pages/settings/Settings.js  Most of features and functionality are not working, MAKE ALL FEATURES AND FUNCTIONALITY
-
-Backup & Data
-Data backup and import/export
-
-Theme & UI
-Appearance and branding
