@@ -36,6 +36,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
+
     print(f"Creating access token with data: {to_encode}")
     print(f"Using secret key: {settings.SECRET_KEY[:10]}...")
     print(f"Algorithm: {settings.ALGORITHM}")
@@ -47,6 +48,7 @@ def create_refresh_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
+
     print(f"Creating refresh token with data: {to_encode}")
     print(f"Using secret key: {settings.SECRET_KEY[:10]}...")
     print(f"Algorithm: {settings.ALGORITHM}")
@@ -59,31 +61,30 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
     if token == "2FA_REQUIRED":
         print("Received placeholder token '2FA_REQUIRED' instead of actual JWT")
         return None
-        
+
     if not token or "." not in token:
         print("Invalid token format - token must contain at least one period")
         return None
-        
+
     try:
         print(f"Verifying token: {token[:10]}...")
         print(f"Using secret key: {settings.SECRET_KEY[:10]}...")
         print(f"Algorithm: {settings.ALGORITHM}")
-        
+
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")
-        tenant_id: int = payload.get("tenant_id")
-        
+
         print(f"Token payload: {payload}")
-        
+
         if token_type == "refresh" and payload.get("type") != "refresh":
             print("Token type mismatch")
             return None
-            
+
         if username is None:
             print("No username in token")
             return None
-            
-        token_data = TokenData(username=username, tenant_id=tenant_id)
+
+        token_data = TokenData(username=username)
         return token_data
     except JWTError as e:
         print(f"JWT error: {e}")
@@ -92,35 +93,23 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
         print(f"Unexpected error verifying token: {e}")
         return None
 
-def authenticate_user(db: Session, username: str, password: str, tenant_id: int = None) -> Union[bool, User]:
-    if tenant_id:
-        user = db.query(User).filter(
-            User.username == username,
-            User.tenant_id == tenant_id
-        ).first()
-    else:
-        user = db.query(User).filter(User.username == username).first()
-    
+def authenticate_user(db: Session, username: str, password: str) -> Union[bool, User]:
+    user = db.query(User).filter(User.username == username).first()
+
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
         return False
     return user
 
-def authenticate_staff(db: Session, username: str, pin: str, tenant_id: int = None) -> Union[bool, User]:
-    if tenant_id:
-        user = db.query(User).filter(
-            User.username == username,
-            User.tenant_id == tenant_id
-        ).first()
-    else:
-        user = db.query(User).filter(User.username == username).first()
-    
+def authenticate_staff(db: Session, username: str, pin: str) -> Union[bool, User]:
+    user = db.query(User).filter(User.username == username).first()
+
     if not user:
         return False
     if not user.pin:
         return False
-    
+
     # Try to verify the PIN using bcrypt directly
     try:
         import bcrypt
@@ -130,7 +119,7 @@ def authenticate_staff(db: Session, username: str, pin: str, tenant_id: int = No
         # Fallback to the regular password verification if bcrypt fails
         if verify_password(pin, user.pin):
             return user
-    
+
     return False
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> User:
@@ -139,10 +128,10 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     try:
         token = credentials.credentials
-        
+
         # Check for placeholder tokens
         if token == "2FA_REQUIRED":
             print("Received placeholder token '2FA_REQUIRED' in get_current_user")
@@ -151,21 +140,18 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
                 detail="Two-factor authentication required. Please complete 2FA verification.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-            
+
         token_data = verify_token(token)
         if token_data is None:
             raise credentials_exception
-            
-        user = db.query(User).filter(
-            User.username == token_data.username,
-            User.tenant_id == token_data.tenant_id
-        ).first()
+
+        user = db.query(User).filter(User.username == token_data.username).first()
         if user is None:
             raise credentials_exception
-            
+
         if not user.is_active:
             raise HTTPException(status_code=400, detail="Inactive user")
-            
+
         return user
     except HTTPException:
         # Re-raise HTTP exceptions as-is

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, and_
 from typing import List, Optional
 from datetime import date, datetime
 
@@ -29,7 +29,9 @@ async def create_patient(
     db: Session = Depends(get_db)
 ):
     # Check if patient ID already exists
-    existing_patient = db.query(Patient).filter(Patient.patient_id == patient.patient_id).first()
+    existing_patient = db.query(Patient).filter(
+        Patient.patient_id == patient.patient_id
+    ).first()
     if existing_patient:
         raise HTTPException(
             status_code=400,
@@ -37,14 +39,18 @@ async def create_patient(
         )
     
     # Check if patient with same phone already exists
-    existing_patient = db.query(Patient).filter(Patient.phone == patient.phone).first()
+    existing_patient = db.query(Patient).filter(
+        Patient.phone == patient.phone
+    ).first()
     if existing_patient:
         raise HTTPException(
             status_code=400,
             detail="Patient with this phone number already exists"
         )
     
-    db_patient = Patient(**patient.dict())
+    db_patient = Patient(
+        **patient.dict()
+    )
     db.add(db_patient)
     db.commit()
     db.refresh(db_patient)

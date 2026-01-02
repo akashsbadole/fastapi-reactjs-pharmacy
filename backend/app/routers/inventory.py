@@ -27,7 +27,9 @@ async def create_supplier(
     current_user: User = Depends(require_pharmacist),
     db: Session = Depends(get_db)
 ):
-    db_supplier = Supplier(**supplier.dict())
+    db_supplier = Supplier(
+        **supplier.dict()
+    )
     db.add(db_supplier)
     db.commit()
     db.refresh(db_supplier)
@@ -53,7 +55,9 @@ async def list_suppliers(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Supplier).filter(Supplier.is_active == True)
+    query = db.query(Supplier).filter(
+        Supplier.is_active == True
+    )
     
     if search:
         query = query.filter(
@@ -322,7 +326,9 @@ async def delete_all_medicines(
         )
     
     # Soft delete all medicines
-    db.query(Medicine).filter(Medicine.is_active == True).update({"is_active": False})
+    db.query(Medicine).filter(
+        Medicine.is_active == True
+    ).update({"is_active": False})
     db.commit()
     
     # Create audit log

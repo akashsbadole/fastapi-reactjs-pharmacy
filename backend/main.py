@@ -5,9 +5,8 @@ from sqlalchemy.orm import Session
 import uvicorn
 
 from app.database import get_db
-from app.routers import auth, inventory, prescriptions, patients, billing, reports, pos, audit, support, subscription, notifications, sms, ai, payments, tenants
+from app.routers import auth, inventory, prescriptions, patients, billing, reports, pos, audit, support, subscription, notifications, sms, ai, payments
 from app.routers.settings import router as settings_router
-from app.middleware import TenantMiddleware
 from app.config import settings
 
 app = FastAPI(
@@ -15,9 +14,6 @@ app = FastAPI(
     description="A comprehensive pharmacy management system built with FastAPI",
     version="1.0.0"
 )
-
-# Add tenant middleware
-app.add_middleware(TenantMiddleware)
 
 # CORS middleware
 app.add_middleware(
@@ -30,7 +26,6 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(tenants.router, prefix="/api/tenants", tags=["tenants"])
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"])
 app.include_router(prescriptions.router, prefix="/api/prescriptions", tags=["prescriptions"])

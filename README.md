@@ -1,6 +1,6 @@
 # Pharmacy Management System
 
-A comprehensive pharmacy management system built with FastAPI backend and React frontend, now with multi-tenant support and a desktop application.
+A comprehensive pharmacy management system built with FastAPI backend and React frontend,   and a desktop application.
 
 ## Features
 
@@ -14,14 +14,6 @@ A comprehensive pharmacy management system built with FastAPI backend and React 
 - Profile image support for user accounts
 - Last login tracking and session management
 
-### 🟢 Multi-Tenant Architecture
-- Complete data isolation between tenants
-- Subdomain-based tenant identification (tenant.pharmacy.com)
-- Custom domain support for enterprise clients
-- Tenant-specific settings and configurations
-- User invitations and tenant management
-- Shared database with tenant isolation
-- Scalable architecture for SaaS deployment
 
 ### 🟢 Desktop Application
 - Cross-platform desktop app (Windows, macOS, Linux)
@@ -251,7 +243,6 @@ pharmacy-management-system/
    ```bash
    # Create .env file
    echo "REACT_APP_API_URL=http://localhost:8000" > .env
-   echo "REACT_APP_TENANT_ID=default" >> .env
    ```
 
 3. Start the desktop application:
@@ -344,39 +335,6 @@ If you prefer to set up manually:
    ```bash
    npm start
    ```
-
-## Multi-Tenant Setup
-
-### Default Tenant
-
-The system automatically creates a default tenant with ID "default" during initial setup.
-
-### Creating New Tenants
-
-1. **Via API:**
-   ```bash
-   curl -X POST "http://localhost:8000/api/tenants/" \
-   -H "Content-Type: application/json" \
-   -d '{
-     "name": "Pharmacy Name",
-     "subdomain": "pharmacy",
-     "admin_email": "admin@pharmacy.com",
-     "plan": "premium"
-   }'
-   ```
-
-2. **Via Admin Panel:**
-   - Access the admin panel
-   - Navigate to Tenant Management
-   - Create new tenant with required details
-
-### Subdomain Configuration
-
-For production deployment, configure subdomain routing:
-- See [Subdomain Setup Guide](./SUBDOMAIN_SETUP_GUIDE.md)
-- Configure DNS records
-- Set up reverse proxy
-- Configure SSL certificates
 
 ## Default Credentials
 
@@ -488,7 +446,7 @@ REACT_APP_API_URL=http://localhost:8000
 #### Desktop (.env)
 ```env
 REACT_APP_API_URL=http://localhost:8000
-REACT_APP_TENANT_ID=default
+
 ```
 
 ## Contributing
@@ -508,7 +466,6 @@ This project is licensed under the MIT License.
 
 ### ✅ Fully Implemented Features
 - **Authentication & User Management**: Complete JWT-based authentication with role-based access control, 2FA support, and PIN-based POS authentication
-- **Multi-Tenant Architecture**: Complete multi-tenant system with data isolation, subdomain support, and tenant management
 - **Desktop Application**: Full-featured desktop app with offline functionality, barcode scanning, and receipt printing
 - **Inventory Management**: Full CRUD operations for medicines with batch tracking, expiry alerts, and alternative medicine mapping
 - **CSV Import/Export**: Bulk data management with validation and error handling
@@ -547,10 +504,7 @@ This project is licensed under the MIT License.
 
 ## Documentation
 
-- [Desktop Application Guide](./DESKTOP_APPLICATION_GUIDE.md)
-- [Multi-Tenant Implementation](./MULTI_TENANT_IMPLEMENTATION.md)
-- [Subdomain Setup Guide](./SUBDOMAIN_SETUP_GUIDE.md)
-- [Desktop Application Options](./DESKTOP_APPLICATION_OPTIONS.md)
+
 
 ## Support
 

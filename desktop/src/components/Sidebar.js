@@ -164,9 +164,9 @@ function Sidebar({ mobileOpen, handleDrawerToggle, user }) {
         <Typography variant="h6" noWrap component="div">
           Pharmacy Desktop
         </Typography>
-        <Typography variant="caption" noWrap>
+        {/* <Typography variant="caption" noWrap>
           Multi-Tenant System
-        </Typography>
+        </Typography> */}
       </Box>
       
       <Divider />

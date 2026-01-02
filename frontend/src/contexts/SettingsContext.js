@@ -543,7 +543,7 @@ export const SettingsProvider = ({ children }) => {
   // Fetch settings from API
   const fetchSettings = async (category = null) => {
     dispatch({ type: SETTINGS_ACTIONS.FETCH_START });
-    
+
     try {
       if (category) {
         // Fetch specific category
@@ -558,44 +558,56 @@ export const SettingsProvider = ({ children }) => {
           backup: endpoints.SETTINGS.BACKUP,
           users: endpoints.SETTINGS.USERS,
         }[category];
-        
+
         if (!endpoint) {
           throw new Error(`Unknown settings category: ${category}`);
         }
-        
+
         const response = await api.get(endpoint);
         dispatch({
           type: SETTINGS_ACTIONS.FETCH_SUCCESS,
           payload: { [category]: response.data },
         });
       } else {
-        // Fetch all settings categories
-        const [organization, pos, theme, inventory, notifications, integrations, compliance, backup, users] = await Promise.all([
-          api.get(endpoints.SETTINGS.ORGANIZATION),
-          api.get(endpoints.SETTINGS.POS),
-          api.get(endpoints.SETTINGS.THEME),
-          api.get(endpoints.SETTINGS.INVENTORY),
-          api.get(endpoints.SETTINGS.NOTIFICATIONS),
-          api.get(endpoints.SETTINGS.INTEGRATIONS),
-          api.get(endpoints.SETTINGS.COMPLIANCE),
-          api.get(endpoints.SETTINGS.BACKUP),
-          api.get(endpoints.SETTINGS.USERS),
-        ]);
-        
+        // Fetch all settings categories sequentially with error handling
+        const settingsCategories = [
+          { key: 'organization', endpoint: endpoints.SETTINGS.ORGANIZATION },
+          { key: 'pos', endpoint: endpoints.SETTINGS.POS },
+          { key: 'theme', endpoint: endpoints.SETTINGS.THEME },
+          { key: 'inventory', endpoint: endpoints.SETTINGS.INVENTORY },
+          { key: 'notifications', endpoint: endpoints.SETTINGS.NOTIFICATIONS },
+          { key: 'integrations', endpoint: endpoints.SETTINGS.INTEGRATIONS },
+          { key: 'compliance', endpoint: endpoints.SETTINGS.COMPLIANCE },
+          { key: 'backup', endpoint: endpoints.SETTINGS.BACKUP },
+          { key: 'users', endpoint: endpoints.SETTINGS.USERS },
+        ];
+
+        const results = {};
+        const errors = [];
+
+        // Fetch each category sequentially to avoid overwhelming the backend
+        for (const { key, endpoint } of settingsCategories) {
+          try {
+            const response = await api.get(endpoint);
+            results[key] = response.data;
+          } catch (error) {
+            console.warn(`Failed to fetch ${key} settings:`, error.response?.data?.detail || error.message);
+            errors.push(`${key}: ${error.response?.data?.detail || error.message}`);
+            // Use default values for failed categories
+            results[key] = initialState[key];
+          }
+        }
+
         dispatch({
           type: SETTINGS_ACTIONS.FETCH_SUCCESS,
-          payload: {
-            organization: organization.data,
-            pos: pos.data,
-            theme: theme.data,
-            inventory: inventory.data,
-            notifications: notifications.data,
-            integrations: integrations.data,
-            compliance: compliance.data,
-            backup: backup.data,
-            users: users.data,
-          },
+          payload: results,
         });
+
+        // Show warning if some categories failed to load
+        if (errors.length > 0) {
+          console.warn('Some settings categories failed to load:', errors);
+          toast.warning(`${errors.length} settings categories could not be loaded. Using default values.`);
+        }
       }
     } catch (error) {
       const errorMessage = error.response?.data?.detail || 'Failed to fetch settings';

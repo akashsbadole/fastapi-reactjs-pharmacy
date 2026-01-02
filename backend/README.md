@@ -186,3 +186,16 @@ pytest
 ## License
 
 This project is licensed under the MIT License.
+
+## demo
+
+I've successfully fixed the workspace problems with the `/api/auth/login` endpoint. Here's what was done:
+
+2. Updated the Alembic configuration to use SQLite instead of PostgreSQL
+7. Created default users with credentials:
+   - Admin: username=admin, password=admin123, PIN=1234
+   - Pharmacist: username=pharmacist, password=pharm123, PIN=5678
+   - Cashier: username=cashier, password=cash123, PIN=9012
+   - Doctor: username=doctor, password=doc123, PIN=3456
+
+The login endpoint is now working correctly and returns JWT tokens upon successful authentication.

@@ -18,7 +18,6 @@ from sqlalchemy import func
 
 from ..database import get_db
 from ..models import User, AuditLog
-from ..middleware import get_current_tenant_id
 from ..schemas.auth import (
     User as UserSchema, UserCreate, UserUpdate, LoginRequest, Token, RefreshTokenRequest,
     PasswordChange, StaffLoginRequest, StaffLoginResponse, ProfileImageUpload,
@@ -39,41 +38,26 @@ security = HTTPBearer()
 @router.post("/register", response_model=UserSchema)
 async def register(
     user: UserCreate,
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
-    # Get tenant ID from request
-    try:
-        tenant_id = get_current_tenant_id(request)
-    except:
-        # If no tenant is identified, use default tenant (for system admin)
-        tenant_id = 1
-    
-    # Check if user already exists in the same tenant
-    db_user = db.query(User).filter(
-        User.username == user.username,
-        User.tenant_id == tenant_id
-    ).first()
+    # Check if user already exists
+    db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
         raise HTTPException(
             status_code=400,
-            detail="Username already registered in this tenant"
+            detail="Username already registered"
         )
-    
-    db_user = db.query(User).filter(
-        User.email == user.email,
-        User.tenant_id == tenant_id
-    ).first()
+
+    db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(
             status_code=400,
-            detail="Email already registered in this tenant"
+            detail="Email already registered"
         )
-    
+
     # Create new user
     hashed_password = get_password_hash(user.password)
     db_user = User(
-        tenant_id=tenant_id,
         username=user.username,
         email=user.email,
         full_name=user.full_name,
@@ -81,14 +65,13 @@ async def register(
         role=user.role,
         hashed_password=hashed_password
     )
-    
+
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    
+
     # Create audit log
     audit_log = AuditLog(
-        tenant_id=tenant_id,
         user_id=db_user.id,
         action="CREATE",
         resource_type="USER",
@@ -97,7 +80,7 @@ async def register(
     )
     db.add(audit_log)
     db.commit()
-    
+
     return db_user
 
 @router.get("/test")
@@ -107,69 +90,48 @@ async def test_auth():
 @router.post("/login", response_model=Token)
 async def login(
     login_data: LoginRequest,
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
-    try:
-        # Get tenant ID from request
-        try:
-            tenant_id = get_current_tenant_id(request)
-        except:
-            # If no tenant is identified, try to find user by username across all tenants
-            user = db.query(User).filter(User.username == login_data.username).first()
-            if user:
-                tenant_id = user.tenant_id
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Incorrect username or password",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-        
-        user = authenticate_user(db, login_data.username, login_data.password, tenant_id)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        # Proceed with normal login
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user.username, "tenant_id": user.tenant_id}, expires_delta=access_token_expires
+    user = authenticate_user(db, login_data.username, login_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-        refresh_token = create_refresh_token(data={"sub": user.username, "tenant_id": user.tenant_id})
-        
-        # Update last login
-        user.last_login = func.now()
+
+    # Proceed with normal login
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    refresh_token = create_refresh_token(data={"sub": user.username})
+
+    # Update last login
+    user.last_login = func.now()
+    db.commit()
+
+    # Create audit log
+    try:
+        audit_log = AuditLog(
+            user_id=user.id,
+            action="LOGIN",
+            resource_type="USER",
+            resource_id=user.id,
+            new_values=f"User {user.username} logged in"
+        )
+        db.add(audit_log)
         db.commit()
-        
-        # Create audit log
-        try:
-            audit_log = AuditLog(
-                tenant_id=user.tenant_id,
-                user_id=user.id,
-                action="LOGIN",
-                resource_type="USER",
-                resource_id=user.id,
-                new_values=f"User {user.username} logged in"
-            )
-            db.add(audit_log)
-            db.commit()
-        except Exception as e:
-            print(f"Error creating audit log: {e}")
-            # Continue without audit log
-            pass
-        
-        return {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer"
-        }
     except Exception as e:
-        print(f"Login error: {e}")
-        raise
+        print(f"Error creating audit log: {e}")
+        # Continue without audit log
+        pass
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
 
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
@@ -183,23 +145,20 @@ async def refresh_token(
             detail="Invalid refresh token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    user = db.query(User).filter(
-        User.username == token_data.username,
-        User.tenant_id == token_data.tenant_id
-    ).first()
+
+    user = db.query(User).filter(User.username == token_data.username).first()
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive"
         )
-    
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username, "tenant_id": user.tenant_id}, expires_delta=access_token_expires
+        data={"sub": user.username}, expires_delta=access_token_expires
     )
-    refresh_token = create_refresh_token(data={"sub": user.username, "tenant_id": user.tenant_id})
-    
+    refresh_token = create_refresh_token(data={"sub": user.username})
+
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -290,8 +249,7 @@ async def list_users(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    # Only list users from the same tenant
-    users = db.query(User).filter(User.tenant_id == current_user.tenant_id).offset(skip).limit(limit).all()
+    users = db.query(User).offset(skip).limit(limit).all()
     return users
 
 @router.get("/users/{user_id}", response_model=UserSchema)
@@ -300,11 +258,7 @@ async def get_user(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    # Only get users from the same tenant
-    user = db.query(User).filter(
-        User.id == user_id,
-        User.tenant_id == current_user.tenant_id
-    ).first()
+    user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user
@@ -316,14 +270,10 @@ async def update_user(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    # Only update users from the same tenant
-    db_user = db.query(User).filter(
-        User.id == user_id,
-        User.tenant_id == current_user.tenant_id
-    ).first()
+    db_user = db.query(User).filter(User.id == user_id).first()
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Store old values for audit
     old_values = {
         "username": db_user.username,
@@ -333,15 +283,15 @@ async def update_user(
         "role": db_user.role,
         "is_active": db_user.is_active
     }
-    
+
     # Update user fields if provided
     update_data = user_update.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(db_user, field, value)
-    
+
     db.commit()
     db.refresh(db_user)
-    
+
     # Create audit log
     new_values = {
         "username": db_user.username,
@@ -351,7 +301,7 @@ async def update_user(
         "role": db_user.role,
         "is_active": db_user.is_active
     }
-    
+
     audit_log = AuditLog(
         user_id=current_user.id,
         action="UPDATE",
@@ -362,7 +312,7 @@ async def update_user(
     )
     db.add(audit_log)
     db.commit()
-    
+
     return db_user
 
 @router.delete("/users/{user_id}")
@@ -371,29 +321,25 @@ async def delete_user(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    # Only delete users from the same tenant
-    db_user = db.query(User).filter(
-        User.id == user_id,
-        User.tenant_id == current_user.tenant_id
-    ).first()
+    db_user = db.query(User).filter(User.id == user_id).first()
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Don't allow users to delete themselves
     if db_user.id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
-    
+
     # Store user info for audit
     user_info = {
         "username": db_user.username,
         "email": db_user.email,
         "full_name": db_user.full_name
     }
-    
+
     # Delete user
     db.delete(db_user)
     db.commit()
-    
+
     # Create audit log
     audit_log = AuditLog(
         user_id=current_user.id,
@@ -405,7 +351,7 @@ async def delete_user(
     )
     db.add(audit_log)
     db.commit()
-    
+
     return {"message": "User deleted successfully"}
 
 @router.patch("/users/{user_id}/toggle-status")
@@ -414,24 +360,20 @@ async def toggle_user_status(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    # Only toggle status of users from the same tenant
-    db_user = db.query(User).filter(
-        User.id == user_id,
-        User.tenant_id == current_user.tenant_id
-    ).first()
+    db_user = db.query(User).filter(User.id == user_id).first()
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Don't allow users to deactivate themselves
     if db_user.id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot change your own status")
-    
+
     # Toggle user status
     old_status = db_user.is_active
     db_user.is_active = not db_user.is_active
     db.commit()
     db.refresh(db_user)
-    
+
     # Create audit log
     audit_log = AuditLog(
         user_id=current_user.id,
@@ -443,73 +385,52 @@ async def toggle_user_status(
     )
     db.add(audit_log)
     db.commit()
-    
+
     return {"message": f"User is now {'active' if db_user.is_active else 'inactive'}"}
 
 @router.post("/staff-login", response_model=StaffLoginResponse)
 async def staff_login(
     login_data: StaffLoginRequest,
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
-    try:
-        # Get tenant ID from request
-        try:
-            tenant_id = get_current_tenant_id(request)
-        except:
-            # If no tenant is identified, try to find user by username across all tenants
-            user = db.query(User).filter(User.username == login_data.username).first()
-            if user:
-                tenant_id = user.tenant_id
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Incorrect username or PIN",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-        
-        user = authenticate_staff(db, login_data.username, login_data.pin, tenant_id)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or PIN",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user.username, "tenant_id": user.tenant_id}, expires_delta=access_token_expires
+    user = authenticate_staff(db, login_data.username, login_data.pin)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or PIN",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-        
-        # Update last login
-        user.last_login = func.now()
+
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+
+    # Update last login
+    user.last_login = func.now()
+    db.commit()
+
+    # Create audit log
+    try:
+        audit_log = AuditLog(
+            user_id=user.id,
+            action="STAFF_LOGIN",
+            resource_type="USER",
+            resource_id=user.id,
+            new_values=f"Staff {user.username} logged in with PIN"
+        )
+        db.add(audit_log)
         db.commit()
-        
-        # Create audit log
-        try:
-            audit_log = AuditLog(
-                tenant_id=user.tenant_id,
-                user_id=user.id,
-                action="STAFF_LOGIN",
-                resource_type="USER",
-                resource_id=user.id,
-                new_values=f"Staff {user.username} logged in with PIN"
-            )
-            db.add(audit_log)
-            db.commit()
-        except Exception as e:
-            print(f"Error creating audit log: {e}")
-            # Continue without audit log
-            pass
-        
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "user": user
-        }
     except Exception as e:
-        print(f"Staff login error: {e}")
-        raise
+        print(f"Error creating audit log: {e}")
+        # Continue without audit log
+        pass
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user
+    }
 
 # Profile image upload endpoint
 @router.post("/upload-profile-image", response_model=UserSchema)

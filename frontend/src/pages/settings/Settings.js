@@ -124,6 +124,13 @@ const Settings = () => {
 
   const ActiveComponent = settingsTabs.find(tab => tab.id === activeTab)?.component;
 
+  // Check if current tab's settings are available
+  const isCurrentTabAvailable = () => {
+    // For now, assume all tabs are available since we use default values
+    // In the future, we could check if the API call succeeded
+    return true;
+  };
+
   return (
     <div className="py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -138,34 +145,49 @@ const Settings = () => {
           {/* Settings Navigation */}
           <div className="lg:col-span-1">
             <nav className="space-y-1">
-              {settingsTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabChange(tab.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    activeTab === tab.id
-                      ? 'bg-primary-100 text-primary-900 border-r-2 border-primary-500'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <tab.icon
-                      className={`mr-3 h-5 w-5 flex-shrink-0 ${
+              {settingsTabs.map((tab) => {
+                const isAvailable = isCurrentTabAvailable();
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id)}
+                    disabled={!isAvailable}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      activeTab === tab.id
+                        ? 'bg-primary-100 text-primary-900 border-r-2 border-primary-500'
+                        : !isAvailable
+                        ? 'text-gray-400 cursor-not-allowed bg-gray-50'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <tab.icon
+                        className={`mr-3 h-5 w-5 flex-shrink-0 ${
+                          activeTab === tab.id
+                            ? 'text-primary-500'
+                            : !isAvailable
+                            ? 'text-gray-300'
+                            : 'text-gray-400'
+                        }`}
+                      />
+                      <div className="text-left">
+                        <div className={isAvailable ? '' : 'line-through'}>
+                          {tab.name}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {tab.description}
+                          {!isAvailable && ' (Not Available)'}
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRightIcon
+                      className={`h-4 w-4 ${
                         activeTab === tab.id ? 'text-primary-500' : 'text-gray-400'
                       }`}
                     />
-                    <div className="text-left">
-                      <div>{tab.name}</div>
-                      <div className="text-xs text-gray-500">{tab.description}</div>
-                    </div>
-                  </div>
-                  <ChevronRightIcon
-                    className={`h-4 w-4 ${
-                      activeTab === tab.id ? 'text-primary-500' : 'text-gray-400'
-                    }`}
-                  />
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </nav>
 
             {/* Action Buttons */}

@@ -622,31 +622,31 @@ export const notificationService = {
   },
 };
 
-export const tenantService = {
-  // Get tenants (for super admin)
-  getTenants: async () => {
-    const response = await api.get('/api/tenants');
-    return response.data;
-  },
+// export const tenantService = {
+//   // Get tenants (for super admin)
+//   getTenants: async () => {
+//     const response = await api.get('/api/tenants');
+//     return response.data;
+//   },
   
-  // Create tenant
-  createTenant: async (tenant) => {
-    const response = await api.post('/api/tenants', tenant);
-    return response.data;
-  },
+//   // Create tenant
+//   createTenant: async (tenant) => {
+//     const response = await api.post('/api/tenants', tenant);
+//     return response.data;
+//   },
   
-  // Get current tenant info
-  getCurrentTenant: async () => {
-    const response = await api.get('/api/tenants/current');
-    return response.data;
-  },
+//   // Get current tenant info
+//   getCurrentTenant: async () => {
+//     const response = await api.get('/api/tenants/current');
+//     return response.data;
+//   },
   
-  // Update tenant
-  updateTenant: async (id, tenant) => {
-    const response = await api.put(`/api/tenants/${id}`, tenant);
-    return response.data;
-  },
-};
+//   // Update tenant
+//   updateTenant: async (id, tenant) => {
+//     const response = await api.put(`/api/tenants/${id}`, tenant);
+//     return response.data;
+//   },
+// };
 
 export const billingService = {
   // Get invoices
